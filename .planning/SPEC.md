@@ -188,3 +188,97 @@ The system SHALL provide public-safe guidance and synthetic fixtures for the com
 - WHEN they follow the project documentation
 - THEN they can install, export, validate, review Git changes, and orient an agent or RAG index
 - AND all published examples remain synthetic and credential-free
+
+### REQ: opt-in-interface-address-retrieval
+
+The system SHALL preserve the default device-only export while allowing an operator to request the complete device-interface-assigned-IP relationship slice.
+
+#### Scenario: relationship-export-request
+
+- GIVEN NetBox returns paginated device, device-interface, and IP-address records
+- WHEN an operator explicitly requests relationship export
+- THEN every permitted page needed for the device → interface → assigned-IP slice is retrieved
+- AND the existing same-origin, loop, HTTPS, bounded-error, and token-redaction controls apply to every resource
+
+#### Scenario: default-export-compatibility
+
+- GIVEN an operator uses the existing export command without opting into relationships
+- WHEN the export completes
+- THEN its canonical device artifact and agent index retain the v0.1 behavior
+- AND no interface or IP-address request is issued
+
+### REQ: deterministic-canonical-relationship-artifacts
+
+The system SHALL normalize device interfaces and their assigned IP addresses into deterministic, schema-versioned canonical artifacts.
+
+#### Scenario: unchanged-relationships
+
+- GIVEN two relationship exports receive semantically identical records in different API orders
+- WHEN canonical artifacts are rendered
+- THEN the output is byte-identical
+- AND records, references, and mapping keys use stable ordering and NetBox-backed identities
+
+#### Scenario: relationship-scope
+
+- GIVEN NetBox contains unassigned addresses, addresses assigned to virtual-machine interfaces, prefixes, VLANs, cables, or virtual machines
+- WHEN the v0.2 relationship tracer is exported
+- THEN only device interfaces and IP addresses assigned to those interfaces enter the relationship artifacts
+- AND broader resource expansion remains outside this milestone
+
+### REQ: validated-referential-integrity
+
+The system SHALL validate relationship schemas and typed references before publishing any artifact.
+
+#### Scenario: complete-reference-chain
+
+- GIVEN an exported IP address references a device interface and that interface references a device
+- WHEN the snapshot set is validated
+- THEN each reference identifies its resource type and NetBox ID
+- AND every target exists exactly once in the requested canonical snapshot set
+
+#### Scenario: unusable-reference
+
+- GIVEN a relationship reference is missing, malformed, ambiguous, or points outside the exported device/interface set
+- WHEN validation runs
+- THEN export fails with a bounded operator-facing error before publication
+- AND the invalid source record is identified without exposing response content or credentials
+
+### REQ: atomic-relationship-snapshot-set
+
+The system SHALL publish all requested canonical relationship artifacts and derived indexes as one recoverable snapshot set.
+
+#### Scenario: multi-artifact-publication-failure
+
+- GIVEN a complete valid relationship snapshot set already exists
+- WHEN any fetch, validation, write, sync, replacement, or rollback step fails
+- THEN readers observe either the complete prior set or the complete new set, never a mixed generation
+- AND temporary or newly-created partial artifacts are removed or restored deterministically
+
+### REQ: bounded-relationship-agent-navigation
+
+The system SHALL derive concise agent navigation from canonical relationship artifacts rather than duplicating an unbounded API dump.
+
+#### Scenario: device-network-orientation
+
+- GIVEN a valid relationship snapshot set
+- WHEN the agent index is generated
+- THEN an agent can navigate from a device to its interfaces and assigned IP addresses using stable canonical links
+- AND the index states source freshness, schema version, exporter version, resource counts, and provenance
+
+### REQ: per-resource-relationship-redaction
+
+The system SHALL apply explicit field and custom-field policy independently to devices, interfaces, and IP addresses.
+
+#### Scenario: closed-by-default-related-fields
+
+- GIVEN interfaces or IP addresses contain custom fields or denied optional values
+- WHEN a relationship export runs without explicit inclusion
+- THEN those values do not appear in canonical YAML, Markdown, stdout, stderr, or tracebacks
+- AND mandatory identity and relationship keys cannot be excluded
+
+#### Scenario: public-safe-relationship-example
+
+- GIVEN public documentation and fixtures demonstrate relationship export
+- WHEN the public-readiness gate runs
+- THEN examples remain synthetic and credential-free
+- AND no real interface names, addresses, DNS names, MAC addresses, or inventory relationships are tracked
