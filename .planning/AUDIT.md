@@ -845,3 +845,290 @@ Conditions on close:
 
 Per instruction, this audit did not edit `ROADMAP.md` or `STATE.md`, created no GitHub resource, added no
 remote, pushed nothing, and rewrote no history.
+
+---
+
+## Audit: v0.1.1 Public GitHub Readiness — 2026-07-21 (post-remediation re-audit at `3318077`)
+
+Auditor: Claude Opus 4.8 (`claude-opus-4-8`, 1M context) via Claude Code — independent re-audit invoked
+directly by the operator after the CONDITIONAL findings above were remediated and committed privately.
+
+Scope: re-verify the three conditions on close from the preceding audit against the **committed** tree, and
+re-derive the underlying security, privacy, dependency, CI, and approval-gate evidence rather than accept it
+from the prior pass. Four requirements: REQ-010..REQ-013.
+
+State audited: `HEAD = 3318077` ("docs: prepare public GitHub publication", 12 files, +622/−72),
+`git status --porcelain` **empty** at session start, `git ls-files --others --exclude-standard` **empty**.
+Six reachable commits; annotated tag `v0.1.0` → `a71831f`. Public tree materialized at **44 files**.
+
+Method note: every scanner, pin, and reachability claim was re-executed, not read. Two prior methodological
+corrections (**M1**, **M2**) were re-applied rather than trusted — `pip-audit` with an explicit `-r` against
+a frozen export, and Gitleaks pointed at a materialized copy of the tree that would actually ship.
+
+### Prior conditions on close — status
+
+- **D3 (critical) — RESOLVED.** The entire deliverable is now in a commit. `git show --stat 3318077`
+  accounts for `.github/workflows/ci.yml` (new, 46 lines), `CONTRIBUTING.md` (new, 48), `SECURITY.md`
+  (new, 27), `docs/PUBLICATION.md` (new, 76), the `DESIGN.md` remediation (−3/+2 frontmatter, one prose
+  line), the `README.md` fix, and the five planning records. Working tree clean; nothing untracked.
+  The handoff also gained the mechanical guard the finding asked for: `docs/PUBLICATION.md:45` now conditions
+  the command block on "the preparation commit is present, the working tree is clean, the operator approves",
+  and `:48` makes that testable with `test -z "$(git status --porcelain)"` as the first command in the block.
+  Executed literally today, the documented procedure now publishes `3318077` — CI, security policy,
+  contributing guide, and sanitized `DESIGN.md` included.
+
+- **D1 (critical) — RESOLVED, with a residual (see E1).** `docs/PUBLICATION.md:9` now reads "the five commits
+  through `v0.1.0` … each revision contains an obsolete local profile path in `DESIGN.md`. The prepared
+  current tree removes the path, but a full-history mirror retains it in earlier revisions." Verified exactly:
+  `git grep` across `git rev-list --all` places the path at `DESIGN.md:6` (`source:` frontmatter) and
+  `DESIGN.md:64` (prose) in `217d2b0`, `1e07d2a`, `4b4e41e`, `2332025`, and `a71831f` — five commits, the last
+  of which is precisely `v0.1.0` — and **nowhere in `DESIGN.md` at `HEAD`**, where the frontmatter now reads
+  `extends: project-local operational interface baseline` with no `source:` key and the Overview line no
+  longer names an inherited file. The sentence is now accurate about which revisions carry it and about the
+  direction of the exposure, which is what D1 was about. Operator acceptance is explicit and un-defaulted:
+  §1 opens "The operator must explicitly resolve these items", the item states plainly that both disclosures
+  "become permanent public history if mirrored", and no acceptance is recorded as already granted.
+
+- **D2 (warning) — RESOLVED.** The 404 hyperlink is gone. `README.md:178` now reads "Roadmap, requirements,
+  and verification evidence are tracked in `.planning/`; this audit links that directory as [`.planning/`](../.planning/). A
+  link check across all 15 Markdown files in the materialized public tree found **0 broken local links**
+  (6 resolved) and exactly **1 external link**, `https://docs.astral.sh/uv/` → **HTTP 200**. For the record,
+  `https://github.com/earendil-works/saga` still returns 404; it is simply no longer referenced anywhere in
+  the tree. The only surviving mention of Saga is `CLAUDE.md:25` describing `.planning/` as files of record,
+  unlinked.
+
+### Correctness
+
+- [warning] **E1 — `docs/PUBLICATION.md` §1 still slightly understates the obsolete-path exposure, in the same
+  direction D1 did.** "The prepared current tree removes the path" is true of `DESIGN.md` and false of the
+  tree. At `HEAD`, `git grep -c "/home/<user>"` returns **5 occurrences in `.planning/AUDIT.md`** (including
+  the D1 finding itself at `:609` and the acceptance-gate section at `:795`) and **2 in
+  `.planning/TRACEABILITY.md`**. Both files are tracked, so both publish, and the path therefore ships as
+  _current content_ — quoted inside the audit record rather than sitting in `DESIGN.md`, but current content
+  all the same. This matters only because the approval gate is procedural (**S5** in the prior pass: nothing
+  technically prevents a push), which makes the accuracy of the disclosure the actual control. An operator
+  reading §1 today would accept a marginally smaller exposure than the one that exists. Fix is one clause:
+  note that the path also remains quoted in `.planning/AUDIT.md` and `.planning/TRACEABILITY.md` as part of
+  the published audit record. On merits the string remains what the prior pass judged it — a local username
+  and a dotfile path, no host, no address, no credential — so this is an accuracy defect, not a safety one.
+  Related and unimplemented: prior finding **OP1** recommended stating in the handoff that `.planning/`
+  publishes in full. Doing both is a single sentence.
+
+- [warning] **E2 — the handoff's evidence list has already drifted behind the tree it describes.**
+  `docs/PUBLICATION.md:71` says "Gitleaks 8.30.1 scanned all five commits with no findings." Six commits are
+  now reachable, and the one outside that claim is the publication commit itself — the commit that introduces
+  every file the operator is about to publish. The claim is not wrong about what was done; it is wrong about
+  what it now covers. This session's re-run closes the gap (6 commits, 389.58 KB, no leaks), but the document
+  will drift again on the next commit. Fix: phrase the evidence bullets against "all reachable commits"
+  rather than a frozen count, or restate the count at the moment of publication. This is the third instance
+  in two audits of a static sentence in this document falling out of step with the repository — D1 was the
+  first, E1 the second.
+
+- [info] **E3 — M1's methodological correction did not land in the document.** `docs/PUBLICATION.md:73` still
+  records the bare form, `pip-audit --strict`. A reader re-running the documented check literally re-creates
+  the no-op risk the prior audit identified: with no `-r`/`-e` argument it audits the ambient environment.
+  Re-run correctly this session against `uv export --frozen --all-groups` (505 lines, 421 hash-pinned):
+  **no known vulnerabilities**. Worth writing the explicit form into the bullet so the check cannot silently
+  degrade.
+
+- [info] **E5 — the committed `AUDIT.md` contains a statement that its own commit falsified.** Line 609 reads
+  "appears in **all five commits, including `HEAD`**", which was true when written against `a71831f` and
+  became false the moment `3318077` landed, since that commit both records the finding and removes the path.
+  Dated audit records are allowed to be historical, but a public reader hits the contradiction with no marker.
+  This section resolves it; no edit to the prior section is needed or appropriate.
+
+- [info] **C1 — carried forward, unchanged.** `README.md:31-34` still opens with `uv tool install .` without a
+  preceding `git clone`, and `CONTRIBUTING.md:11` still carries the literal `git clone <repository-url>`
+  placeholder. Both are cheap to fix once the real URL exists, and `docs/PUBLICATION.md:67` already schedules
+  that patch.
+
+### Safety
+
+- [info] **S1 — no secret, credential, or private-infrastructure disclosure, re-derived independently.**
+  Gitleaks 8.30.1 over `--all --full-history`: **6 commits, 389.58 KB, no leaks**. Gitleaks over the
+  materialized 44-file public tree: 354.41 KB, no leaks. Neither result is suppressed — no `.gitleaksignore`,
+  `gitleaks.toml`, or `.gitleaks.toml` exists in the working tree or anywhere in `git ls-files`. An
+  independent `git grep` across all six commits for credential shapes (`Bearer …`, `Token <hex40>`, `AKIA…`,
+  `ghp_`/`gho_`/`ghu_`/`ghs_`/`ghr_`, `github_pat_`, PEM private-key headers, quoted `password=`/`secret=`/
+  `api_key=`) surfaced only the four synthetic fixture literals in `tests/test_client.py`. A full-history grep
+  for RFC1918 and `172.16/12` address literals returned **zero matches in every commit**. The decisive check
+  is again the targeted one: 27 candidate private strings drawn from `.env` and the live dogfood snapshot —
+  the `NETBOX_URL`, its host literal, the 40-character `NETBOX_TOKEN`, every real device name, every real
+  address — were searched against the full public-tree corpus and against `git log --all -p`. Exactly four
+  matched, all generic vendor/role vocabulary (`Router`, `Switch`, `Server`, `Ruckus`) occurring in synthetic
+  fixtures and audit prose. **The token, the URL, and the host literal matched nothing in either corpus.**
+
+- [info] **S2 — ignore-rule assumptions re-demonstrated.** `git ls-files -i -c --exclude-standard` is empty.
+  `git check-ignore -v` attributes each sensitive path to a specific rule: `.env`→`.gitignore:15`,
+  `.env.local`→`:16`, `snapshot/…`→`:19`, `dist/…`→`:11`, `build/…`→`:12`, `config.yaml`→`:18`,
+  `.planning/.close-out-auditor.log`→`:20`. The `.env.*` / `!.env.example` negation is still ordered correctly
+  and `.env.example` resolves as not-ignored, as does `examples/output/…`. Live `snapshot/` artifacts are mode
+  `0600` and untracked.
+
+- [info] **S3 — the public tree grew by exactly the intended four files.** 44 files now versus 43 in the prior
+  pass. `git ls-files` is 44 and `git ls-files --others --exclude-standard` is 0, where previously the split
+  was 40/4 — the same content, now all tracked. Nothing unexpected entered the publishable set.
+
+- [info] **S4 — `AGENTS.md` publishes as a symlink to `CLAUDE.md`.** Tracked as a symlink (mode 120000) and
+  materialized as one. GitHub renders it as a link rather than following it; harmless, but it means the
+  cross-CLI convention is visible to a public reader and `CLAUDE.md` — which contains the project's internal
+  agent instructions — is unavoidably part of the published surface. Already true before this milestone;
+  noted because the file's audience changes on publication.
+
+- [info] **S5 — the approval gate remains procedural, not technical.** The local `gh` CLI is authenticated as
+  `kevinb361` with `repo` and `workflow` scopes. Nothing in this environment prevents an agent or script with
+  shell access from creating the repository and pushing. Unchanged, and the reason **E1** is worth fixing.
+
+- [info] **S6 — the private mirror is now one commit behind local `main`.** `refs/remotes/origin/main` is
+  `a71831f` while `refs/heads/main` is `3318077`; the publication commit has not been pushed to Gitea either.
+  This is correct for an audit that was told to push nothing, and `docs/PUBLICATION.md` pushes from the local
+  clone, so the mirror lag cannot cause the wrong tree to publish. It matters for one case only: if the
+  operator ever mirrors to GitHub _from the Gitea copy_ rather than from this working clone, they would
+  publish `a71831f` — the exact tree D3 warned about. Worth a line in the handoff if that path is ever
+  considered.
+
+### Test Coverage
+
+- [info] **TC1 — both matrix legs reproduced, the 3.12 leg inside the public tree.** 3.11.14 (project venv):
+  `make ci` → black clean 15 files, ruff clean, mypy clean 15 source files, `pytest -n auto` **39 passed**.
+  3.12.3: executed inside the materialized 44-file public-tree copy with `UV_FROZEN=1` and an isolated
+  `UV_PROJECT_ENVIRONMENT`, syncing from the frozen lock → identical results, **39 passed**. The second run
+  again doubles as a self-sufficiency proof: the published tree builds, type-checks, and tests with `.env`,
+  `snapshot/`, `dist/`, and every cache absent.
+
+- [info] **TC2 — the public-safety property still has a test behind it.**
+  `tests/test_examples.py::test_public_docs_and_examples_contain_no_private_networks_or_credentials` runs in
+  the standard gate on both legs, so the docs/examples invariant regresses loudly rather than depending on
+  someone remembering to re-run a scanner.
+
+- [warning] **E4 — TC3 carried forward: the gate still cannot catch the defects this audit found.** There is
+  no link check over `README.md`, and no test asserting that publication-critical files are tracked. The
+  clean-tree precondition landed in the handoff prose (`docs/PUBLICATION.md:48`), which is a real improvement
+  because it is mechanically checkable — but it is checked by the operator reading the document, not by CI.
+  E1 and E2 are both documentation-accuracy defects, and both would be caught by a dozen-line test that walks
+  Markdown links and asserts `git status --porcelain` empty plus the presence of the four artifacts. Not
+  blocking; the evidence that the gap is real is that it has now produced findings in two consecutive audits.
+
+### Architecture Fit
+
+- [info] **AR1 — the CI workflow is unchanged, still least-privilege, and its pins are still current.** Both
+  SHAs were re-verified against the live GitHub API this session rather than eyeballed:
+  `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` resolves to `refs/tags/v7.0.1` exactly and
+  `astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9` to `refs/tags/v9.0.0` exactly, both still the
+  current latest release of their project (published 2026-07-20 and 2026-07-21). Top-level
+  `permissions: contents: read`, no job-level widening, no `pull_request_target`, no `secrets` reference,
+  `persist-credentials: false` on checkout, `concurrency` with `cancel-in-progress`, `timeout-minutes: 10`.
+  `zizmor` 1.27.0 at `--persona=auditor` → **no findings**. `yamllint -d relaxed` → one 82-char line at
+  `ci.yml:36` and nothing else. The workflow remains the strongest part of this milestone.
+
+- [info] **AR2 — job names and branch protection still agree.** `name: Python ${{ matrix.python-version }}`
+  renders `Python 3.11` and `Python 3.12`, verbatim the required checks at `docs/PUBLICATION.md:38`.
+
+- [info] **AR3 — dependency licensing re-checked and clean for MIT redistribution.** Runtime tree: httpx
+  BSD-3-Clause, jsonschema MIT, PyYAML MIT, httpcore BSD-3-Clause, idna BSD-3-Clause, h11/anyio/attrs/
+  referencing/rpds-py/jsonschema-specifications MIT, typing-extensions PSF-2.0, certifi MPL-2.0.
+  Dev-only additions carry MIT/BSD/Apache-2.0, plus `pathspec` (MPL-2.0, a `black` dependency). Neither
+  MPL-2.0 package is vendored or modified, so no source-disclosure obligation attaches — same reasoning as
+  **I2** in the prior pass, now covering `pathspec` as well.
+
+### Operability
+
+- [info] **OP1 — carried forward and still unimplemented.** `.planning/AUDIT.md` is tracked and will publish
+  in full — now 800+ lines of self-critique including this section, and including the deferred, currently
+  unfixed items (redirect diagnostics, output/index path collisions, extreme YAML nesting, malformed-endpoint
+  diagnostics). None is exploitable, and for a pre-alpha tool the transparency is arguably an asset. But the
+  choice is still not written down anywhere, and it is the same sentence that fixes **E1**.
+
+- [info] **OP2 — this audit's own outputs leave the tree dirty, by design.** Writing
+  `.planning/TRACEABILITY.md` and this `AUDIT.md` section makes `git status --porcelain` non-empty, which
+  means `docs/PUBLICATION.md:48`'s precondition will now fail until these records are committed. That is the
+  precondition working as intended rather than a defect, but it is worth stating plainly: the audit records
+  must be committed before publication, and the audit that verifies the commit cannot itself be inside it.
+  Per instruction, nothing was committed by this pass.
+
+- [info] **OP3 — the approval gate holds, verified read-only.** `git remote -v` shows one remote,
+  `origin → gitea:kevin/netbox-scribe.git` (private self-hosted Gitea over SSH). `git for-each-ref` shows
+  exactly three refs: `refs/heads/main 3318077`, `refs/remotes/origin/main a71831f`, `refs/tags/v0.1.0
+dd5f4c5`. `gh api repos/kevinb361/netbox-scribe` → **HTTP 404**. A global GitHub search for repositories
+  named `netbox-scribe` → **0 results**; a broader `netbox scribe` search → **1 result**, the unrelated
+  `liamhoganson/PortScriber` (last pushed 2025-02-04). PyPI `netbox-scribe` → **HTTP 404**, still unclaimed.
+  No GitHub repository, no GitHub remote, no public ref, nothing pushed — including to Gitea.
+
+### ASSERTED Items from TRACEABILITY.md
+
+- None. This session's `/saga-verify` pass classifies all 13 requirements **PROVEN**, with v0.1.1's four at
+  **PROVEN 4 · ASSERTED 0 · OPEN 0 · WAIVED 0**. Every v0.1.1 evidence artifact was re-executed against the
+  committed tree, so no classification rests on a claim inherited from a prior pass — which is the specific
+  thing that changed, since the previous pass could only verify a working tree. REQ-013 remains PROVEN with
+  two prose-accuracy annotations (**E1**, **E2**) recorded here rather than as a status downgrade: its named
+  artifact exists, names the required settings and commands, and its approval gate demonstrably holds.
+
+### Explicit judgment: disclosed Gmail metadata and the obsolete local path
+
+**Gmail commit metadata — PASS, unchanged.** All six commits and the annotated `v0.1.0` tag carry
+`Kevin Blalock <kevin.blalock@gmail.com>` as author, committer, and tagger. It agrees with `LICENSE` and
+`pyproject.toml`, it is the maintainer's chosen public identity, and attributed authorship is the norm for
+open-source publication. Not a credential, not infrastructure, not third-party personal data.
+`docs/PUBLICATION.md` §1 surfaces it for acknowledgement, which is correct handling. No remediation warranted.
+
+**Obsolete local profile path — PASS on merits, one accuracy clause short of complete.** The substantive
+condition from the prior pass is met: the path is out of `DESIGN.md` at `HEAD`, it is confined to the five
+revisions through `v0.1.0`, and §1 now describes that correctly, so a full-history mirror publishes it as
+history rather than as live configuration. What remains is **E1** — the same string is still quoted in the
+tracked audit record, so "the current tree removes the path" overstates the removal by a small margin. The
+string itself is harmless; the reason to fix it is that the operator's acceptance is the only control here,
+and an acceptance gate should not describe a smaller exposure than the real one.
+
+### Verdict
+
+**CONDITIONAL**
+
+- Critical findings: **0** — all three prior conditions on close (D3, D1, D2) verified remediated in `HEAD`
+- Warnings: **3** (E1, E2, E4)
+- Info: **17** (E3, E5, C1, S1, S2, S3, S4, S5, S6, TC1, TC2, AR1, AR2, AR3, OP1, OP2, OP3 — of which E3, E5,
+  S3, S4, OP2 are new this pass and the remainder are carried forward or re-derived confirmations)
+
+Rationale: the milestone's blocking defects are genuinely fixed, and fixed in the way that matters. The
+deliverable is in a commit, the working tree is clean, and the handoff now gates its own command block on a
+mechanically checkable precondition rather than on the operator noticing. Followed literally today, the
+documented procedure publishes `3318077` — with CI, security policy, contributing guide, and a sanitized
+`DESIGN.md` — instead of the `a71831f` tree the previous audit caught it publishing. The history wording is
+now exactly right about scope: five commits through `v0.1.0`, verified commit by commit, with `HEAD`'s
+`DESIGN.md` clean. The dead Saga link is gone and every remaining link in the public tree resolves.
+
+The security substance survived independent re-derivation rather than being re-read. Six commits and the
+44-file materialized public tree are Gitleaks-clean with no suppression file anywhere; a full-history grep
+for RFC1918 literals returns zero matches in every commit; and — the check that actually decides it — the
+real token, the real NetBox URL, its host, and every real device name were searched against both the whole
+public corpus and the full patch history and matched nothing, with the only overlaps being the words
+`Router`, `Switch`, `Server`, and `Ruckus`. Dependencies audit clean against an explicit 505-line frozen
+export, licensing is compatible, both action pins re-verified byte-for-byte against the live GitHub API and
+both still current, zizmor clean at its strictest persona, and both matrix legs green with the 3.12 leg run
+inside the public tree. The approval gate holds absolutely: one private Gitea remote, three refs, no GitHub
+repository, zero global search hits, nothing pushed anywhere.
+
+What holds it at CONDITIONAL is narrow and is not about security. Two sentences in `docs/PUBLICATION.md` are
+inaccurate in the same direction as the defect this remediation was meant to close: §1 claims the current
+tree removes the obsolete path when the path is still quoted in tracked, publishing audit records, and the
+evidence list still says "all five commits" when six are reachable and the uncovered one is the publication
+commit itself. Neither is a safety issue — the path is a username and a dotfile name, and the sixth commit
+scans clean. They matter because this milestone's deliverable is a _correct publication procedure_ whose only
+enforcement is an operator reading that document, which makes the document's accuracy the control. Both fixes
+are one clause each, and one of them also discharges the standing OP1 recommendation to state that
+`.planning/` publishes in full.
+
+Conditions on close:
+
+1. Amend `docs/PUBLICATION.md` §1 to note that the obsolete path also remains quoted in `.planning/AUDIT.md`
+   and `.planning/TRACEABILITY.md`, and — same sentence — that `.planning/` publishes in full (**E1**,
+   **OP1**).
+2. Restate the "Verified preparation evidence" scan claim against all reachable commits rather than a frozen
+   count of five, and record the explicit `pip-audit --strict -r <frozen export>` form (**E2**, **E3**).
+
+Recommended, not blocking: add the dozen-line link-and-tracked-artifact test that would have caught this
+audit's findings and the previous one's (**E4**), and fill the `<repository-url>` placeholder and missing
+`git clone` line once the real URL exists (**C1**).
+
+Per instruction, this audit did not edit `ROADMAP.md` or `STATE.md`, created no remote or public resource,
+pushed nothing, and rewrote no history. It wrote `.planning/TRACEABILITY.md` and this section only, and
+committed nothing.

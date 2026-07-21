@@ -3,9 +3,9 @@ saga_state_version: 1.0
 milestone: v0.1.1
 milestone_name: Public GitHub Readiness
 status: active
-stopped_at: public-readiness audit CONDITIONAL; commit prepared tree privately, then re-audit.
-last_updated: "2026-07-21T23:45:00Z"
-last_activity: 2026-07-21 — frontier audit confirmed security/privacy readiness and identified three publication-mechanics blockers.
+stopped_at: second public-readiness audit CONDITIONAL; mechanical gate remediation is ready to commit.
+last_updated: "2026-07-22T00:05:00Z"
+last_activity: 2026-07-21 — fixed stale publication evidence and added public-artifact/link checks to `make ci`.
 ---
 
 # NetBox Scribe — State
@@ -14,9 +14,9 @@ last_activity: 2026-07-21 — frontier audit confirmed security/privacy readines
 
 Phase/Milestone: v0.1.1 Public GitHub Readiness
 Status: active
-Last activity: 2026-07-21 — independent audit re-proved clean secrets/privacy/dependencies/CI and accepted public Gmail metadata, but returned CONDITIONAL because the prepared deliverable was uncommitted and two publication-doc claims needed correction.
+Last activity: 2026-07-21 — second independent audit verified the committed preparation and returned CONDITIONAL on two stale evidence sentences plus missing mechanical link/artifact enforcement.
 
-Documentation blockers are fixed locally. Commit the prepared tree privately, then rerun the frontier audit. No GitHub remote, repository, or public ref has been created.
+The publication wording is corrected and `make ci` now checks required tracked policies, forbidden generated paths, sanitized `DESIGN.md`, and local Markdown links. Commit this remediation, then rerun the frontier audit. No GitHub remote, repository, or public ref has been created.
 
 ## Active Work
 
@@ -24,9 +24,11 @@ Documentation blockers are fixed locally. Commit the prepared tree privately, th
 - REQ-011 locally complete — least-privilege, immutable-SHA-pinned CI passes zizmor/YAML lint and local Python 3.12 reproduction.
 - REQ-012 locally complete — `SECURITY.md`, `CONTRIBUTING.md`, and README entry points are public-safe.
 - REQ-013 locally complete — `docs/PUBLICATION.md` provides settings and commands while preserving explicit approval.
-- Frontier audit CONDITIONAL: D1 path-history wording fixed; D2 dead Saga link removed; D3 requires the prepared files to exist in a commit before any mirror.
-- Next: verify and commit privately, then re-audit from committed state.
-- Outward publication remains unauthorized.
+### Slice — close public-readiness mechanical gate
+- Correct the broken repository-local link in `.planning/AUDIT.md` without weakening link validation.
+- Verify `make ci`, workflow lint/security checks, and public-tree/history secret scans.
+- Rerun the independent v0.1.1 audit after committing the complete gate fix.
+- Risk: repo-only; no GitHub repository, remote, push, or other outward mutation is authorized.
 
 ## Deferred
 

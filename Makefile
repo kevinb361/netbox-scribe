@@ -1,4 +1,4 @@
-.PHONY: format format-check lint type test ci
+.PHONY: format format-check lint type test public-check ci
 
 format:
 	uv run black .
@@ -16,4 +16,7 @@ type:
 test:
 	uv run pytest -n auto
 
-ci: format-check lint type test
+public-check:
+	uv run python scripts/check_public_readiness.py
+
+ci: format-check lint type test public-check
