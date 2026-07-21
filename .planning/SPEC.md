@@ -63,3 +63,78 @@ The system SHALL export normalized NetBox device records as canonical YAML with 
 - WHEN the device is normalized
 - THEN supported core fields are represented consistently in YAML
 - AND unconfigured custom fields are not copied implicitly
+
+#### Scenario: unnamed-device
+
+- GIVEN NetBox returns a valid device ID with a null, empty, or absent name
+- WHEN the device is normalized
+- THEN its exported name is the deterministic value `device-<id>`
+- AND the complete snapshot remains valid
+
+### REQ: atomic-snapshot-publication
+
+The system SHALL publish a complete snapshot atomically and preserve the last valid snapshot when a run fails.
+
+#### Scenario: publication-failure
+
+- GIVEN a valid snapshot already exists
+- WHEN fetching, writing, syncing, or replacing the new snapshot fails
+- THEN the prior snapshot remains unchanged
+- AND temporary publication files are removed
+
+#### Scenario: derived-view-publication-failure
+
+- GIVEN a valid canonical snapshot and agent index already exist
+- WHEN either new artifact cannot be published
+- THEN canonical YAML never advances beyond its derived index
+- AND a failed canonical replacement restores the prior index
+
+### REQ: published-schema-validation
+
+The system SHALL validate every canonical snapshot against its packaged JSON Schema before publication.
+
+#### Scenario: incompatible-schema-version
+
+- GIVEN a snapshot declares an unsupported schema version
+- WHEN export validation or `nbscribe validate` evaluates it
+- THEN validation fails clearly with the received and expected versions
+- AND the invalid snapshot is not published
+
+### REQ: provenance-aware-agent-index
+
+The system SHALL generate a concise Markdown index as a derived view over canonical inventory.
+
+#### Scenario: agent-orientation
+
+- GIVEN a successful device export
+- WHEN the agent index is generated
+- THEN it identifies itself as derived and links canonical YAML relatively
+- AND it states NetBox source, source freshness, schema version, exporter version, device count, names, and NetBox IDs
+
+### REQ: explicit-export-redaction-policy
+
+The system SHALL require explicit inclusion for custom fields and support optional core-field allow/deny configuration.
+
+#### Scenario: conflicting-policy
+
+- GIVEN a field appears in both include and exclude configuration
+- WHEN inventory is normalized
+- THEN exclusion wins
+- AND mandatory device identity remains present
+
+#### Scenario: closed-custom-fields
+
+- GIVEN NetBox returns custom fields
+- WHEN none are explicitly included
+- THEN no custom field value appears in YAML, Markdown, stdout, or stderr
+
+### REQ: public-safe-operator-guidance
+
+The system SHALL provide public-safe guidance and synthetic fixtures for the complete snapshot workflow.
+
+#### Scenario: cold-reader-workflow
+
+- GIVEN an operator has Python, uv, and a read-only NetBox token
+- WHEN they follow the project documentation
+- THEN they can install, export, validate, review Git changes, and orient an agent or RAG index
+- AND all published examples remain synthetic and credential-free

@@ -1,0 +1,4 @@
+{
+  "close_out_auditor": "claude -p --allowedTools Read,Grep,Glob,Bash,Write,Edit --permission-mode acceptEdits",
+  "_close_out_auditor_note": "Independent frontier CLI used by saga-loop for milestone verify and audit. The loop appends the audit brief as the trailing positional argument."
+}

@@ -54,19 +54,41 @@ def test_export_command_writes_canonical_yaml(
                 "name": "router-01",
                 "display": "Router 01",
                 "status": {"value": "active", "label": "Active"},
+                "last_updated": "2026-07-21T18:00:00Z",
+                "description": "cli-denied-description",
+                "custom_fields": {
+                    "owner": "cli-allowed-owner",
+                    "secret_note": "cli-denied-secret",
+                },
                 "tags": [],
             }
         ],
     }
     output = tmp_path / "inventory" / "devices.yaml"
+    agent_index = tmp_path / "agent" / "INDEX.md"
 
     with _netbox_server(payload) as base_url:
         monkeypatch.setenv("NETBOX_URL", base_url)
         monkeypatch.setenv("NETBOX_TOKEN", "cli-test-secret")
+        command = [
+            "export",
+            "--output",
+            str(output),
+            "--agent-index",
+            str(agent_index),
+            "--exclude-field",
+            "description",
+            "--include-custom-field",
+            "owner",
+            "--include-custom-field",
+            "secret_note",
+            "--exclude-custom-field",
+            "secret_note",
+        ]
 
-        exit_code = main(["export", "--output", str(output)])
+        exit_code = main(command)
         first_export = output.read_bytes()
-        second_exit_code = main(["export", "--output", str(output)])
+        second_exit_code = main(command)
         second_export = output.read_bytes()
 
     assert exit_code == 0
@@ -81,10 +103,126 @@ def test_export_command_writes_canonical_yaml(
                 "name": "router-01",
                 "display": "Router 01",
                 "status": {"value": "active", "label": "Active"},
+                "custom_fields": {"owner": "cli-allowed-owner"},
             }
         ],
     }
-    assert capsys.readouterr().out.count("Exported 1 device") == 2
+    captured = capsys.readouterr()
+    assert captured.out.count("Exported 1 device") == 2
+    combined_output = output.read_text() + agent_index.read_text() + captured.out + captured.err
+    assert "cli-denied-description" not in combined_output
+    assert "cli-denied-secret" not in combined_output
+    assert "cli-test-secret" not in combined_output
+    assert agent_index.read_text() == """# NetBox Scribe Agent Index
+
+> Generated view. Canonical inventory remains authoritative.
+
+- Source: NetBox
+- Source freshness: 2026-07-21T18:00:00Z
+- Schema version: 1
+- Exporter version: 0.1.0.dev0
+- Canonical inventory: [devices.yaml](../inventory/devices.yaml)
+
+## Devices (1)
+
+- `router-01` — NetBox ID 1
+"""
+
+
+def test_export_command_handles_unnamed_device_without_traceback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    payload = {
+        "count": 1,
+        "next": None,
+        "previous": None,
+        "results": [{"id": 7, "name": None, "last_updated": "2026-07-21T19:00:00Z"}],
+    }
+    output = tmp_path / "inventory/devices.yaml"
+    index = tmp_path / "agent/INDEX.md"
+
+    with _netbox_server(payload) as base_url:
+        monkeypatch.setenv("NETBOX_URL", base_url)
+        monkeypatch.setenv("NETBOX_TOKEN", "unnamed-test-secret")
+        exit_code = main(["export", "--output", str(output), "--agent-index", str(index)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert yaml.safe_load(output.read_text())["devices"][0]["name"] == "device-7"
+    assert "`device-7` — NetBox ID 7" in index.read_text()
+    assert "Traceback" not in captured.err
+    assert "unnamed-test-secret" not in captured.out + captured.err
+
+
+def test_export_command_reports_filesystem_failure_without_traceback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    payload = {
+        "count": 1,
+        "next": None,
+        "previous": None,
+        "results": [{"id": 1, "name": "router-01"}],
+    }
+    blocked_parent = tmp_path / "not-a-directory"
+    blocked_parent.write_text("file")
+    output = blocked_parent / "devices.yaml"
+    index = tmp_path / "agent/INDEX.md"
+
+    with _netbox_server(payload) as base_url:
+        monkeypatch.setenv("NETBOX_URL", base_url)
+        monkeypatch.setenv("NETBOX_TOKEN", "filesystem-test-secret")
+        exit_code = main(["export", "--output", str(output), "--agent-index", str(index)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert captured.err.startswith("error: ")
+    assert "Traceback" not in captured.err
+    assert "filesystem-test-secret" not in captured.out + captured.err
+    assert not index.exists()
+
+
+def test_validate_command_reports_incompatible_schema_version(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    snapshot = tmp_path / "devices.yaml"
+    snapshot.write_text("schema_version: 2\nsource: netbox\ndevices: []\n")
+
+    exit_code = main(["validate", str(snapshot)])
+
+    assert exit_code == 1
+    assert "unsupported schema version 2; expected 1" in capsys.readouterr().err
+
+
+def test_validate_command_reports_non_utf8_snapshot_without_traceback(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    snapshot = tmp_path / "devices.yaml"
+    snapshot.write_bytes(b"\xff\xfe")
+
+    exit_code = main(["validate", str(snapshot)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert captured.err == "error: snapshot is not valid UTF-8\n"
+    assert "Traceback" not in captured.err
+
+
+def test_validate_command_reports_schema_violation(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    snapshot = tmp_path / "devices.yaml"
+    snapshot.write_text("schema_version: 1\nsource: netbox\ndevices:\n  - id: 1\n")
+
+    exit_code = main(["validate", str(snapshot)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "snapshot violates schema" in captured.err
+    assert "Traceback" not in captured.err
 
 
 @contextmanager

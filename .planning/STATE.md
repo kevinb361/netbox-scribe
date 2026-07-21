@@ -1,30 +1,29 @@
 ---
 saga_state_version: 1.0
-milestone: v0.1
-milestone_name: First Useful Snapshot
-status: active
-stopped_at: REQ-003 proven; REQ-004 is next.
-last_updated: "2026-07-21T19:45:00Z"
-last_activity: 2026-07-21 — resolved the REQ-003 escalation and verified deterministic canonical YAML export.
+milestone: v0.2
+milestone_name: Network Relationships
+status: idle
+stopped_at: v0.1 closed PASS-CONDITIONAL; v0.2 requires scoping before execution.
+last_updated: "2026-07-21T22:00:00Z"
+last_activity: 2026-07-21 — fixed all pre-commit review findings and verified 33 tests.
 ---
 
 # NetBox Scribe — State
 
 ## Current Position
 
-Phase/Milestone: v0.1 First Useful Snapshot
-Status: active
-Last activity: 2026-07-21 — REQ-003 proved normalized, schema-versioned, byte-identical device YAML through the CLI.
+Phase/Milestone: v0.2 Network Relationships
+Status: idle
+Last activity: 2026-07-21 — fixed bounded non-UTF-8 validation, corrected synthetic-identity wording, and moved example verification onto the production export path; `make ci` passed with 33 tests.
 
-The next bounded slice is REQ-004: publish an export atomically without replacing the last valid snapshot on failure.
+v0.2 has no requirements or bounded slices yet. Scope it before execution.
 
 ## Active Work
 
-- REQ-003 complete — `make ci` passed with 15 tests; focused two-run determinism and output-leak checks passed.
-- Escalation resolved by removing the redundant PyYAML return cast identified by MyPy.
-- Next: plan REQ-004 before implementation.
+None. v0.2 requires a milestone brief and requirements before implementation.
 
 ## Deferred
 
 - 2026-07-21 — NetBox trademark/name review and package reservation are required before public release, not before local development.
 - 2026-07-21 — MCP delivery remains a later capability; v0.1 must prove useful static artifacts first.
+- 2026-07-21 — remaining v0.1 audit follow-ups for v0.2: document that synthesized names can collide with source names; test rollback double-fault/no-prior-index; reduce version-fixture brittleness; strengthen the typed agent-index boundary; identify invalid records operationally; add structured logging.

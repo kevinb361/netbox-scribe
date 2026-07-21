@@ -1,0 +1,47 @@
+schema_version: 1
+source: netbox
+devices:
+  - id: 1
+    name: router-01
+    display: Router 01
+    status:
+      value: active
+      label: Active
+    role:
+      id: 1
+      name: Router
+      slug: router
+    site:
+      id: 1
+      name: Example Lab
+      slug: example-lab
+    serial: SYNTHETIC-001
+    description: Synthetic edge router
+    tags:
+      - id: 1
+        name: Edge
+        slug: edge
+    custom_fields:
+      owner: example-team
+  - id: 2
+    name: switch-01
+    display: Switch 01
+    status:
+      value: active
+      label: Active
+    role:
+      id: 2
+      name: Access Switch
+      slug: access-switch
+    site:
+      id: 1
+      name: Example Lab
+      slug: example-lab
+    serial: SYNTHETIC-002
+    description: Synthetic access switch
+    tags:
+      - id: 2
+        name: Managed
+        slug: managed
+    custom_fields:
+      owner: example-team

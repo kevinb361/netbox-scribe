@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:netbox-scribe:schema:devices:v1",
+  "title": "NetBox Scribe Device Snapshot v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "source", "devices"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "source": {"const": "netbox"},
+    "devices": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/device"}
+    }
+  },
+  "$defs": {
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "integer"},
+        "name": {"type": "string"},
+        "slug": {"type": "string"}
+      }
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "value": {"type": "string"},
+        "label": {"type": "string"}
+      }
+    },
+    "ip": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "integer"},
+        "address": {"type": "string"},
+        "dns_name": {"type": "string"},
+        "description": {"type": "string"}
+      }
+    },
+    "device_type": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "integer"},
+        "model": {"type": "string"},
+        "slug": {"type": "string"},
+        "manufacturer": {"$ref": "#/$defs/reference"}
+      }
+    },
+    "device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": {"type": "integer"},
+        "name": {"type": "string", "minLength": 1},
+        "display": {"type": "string"},
+        "status": {"$ref": "#/$defs/status"},
+        "role": {"$ref": "#/$defs/reference"},
+        "device_type": {"$ref": "#/$defs/device_type"},
+        "site": {"$ref": "#/$defs/reference"},
+        "location": {"$ref": "#/$defs/reference"},
+        "rack": {"$ref": "#/$defs/reference"},
+        "tenant": {"$ref": "#/$defs/reference"},
+        "platform": {"$ref": "#/$defs/reference"},
+        "serial": {"type": "string"},
+        "asset_tag": {"type": "string"},
+        "description": {"type": "string"},
+        "primary_ip4": {"$ref": "#/$defs/ip"},
+        "primary_ip6": {"$ref": "#/$defs/ip"},
+        "tags": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/reference"}
+        },
+        "custom_fields": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}

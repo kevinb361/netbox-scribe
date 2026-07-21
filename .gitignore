@@ -17,6 +17,7 @@ build/
 !.env.example
 config.yaml
 snapshot/
+.planning/.close-out-auditor.log
 
 # Editors and OS
 .idea/
