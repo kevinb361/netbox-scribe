@@ -1,5 +1,7 @@
 # NetBox Scribe
 
+[![CI](https://github.com/kevinb361/netbox-scribe/actions/workflows/ci.yml/badge.svg)](https://github.com/kevinb361/netbox-scribe/actions/workflows/ci.yml)
+
 **Versioned, AI-ready infrastructure context from NetBox.**
 
 NetBox Scribe exports authoritative NetBox data into deterministic YAML and concise Markdown. The snapshot is designed for Git review, offline inspection, RAG indexing, and controlled use by coding agents without giving every agent credentials to a live NetBox instance.

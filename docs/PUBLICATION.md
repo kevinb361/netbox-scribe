@@ -1,6 +1,10 @@
 # Public GitHub publication handoff
 
-This document prepares publication; it does not authorize repository creation or pushing to GitHub.
+This document records the publication procedure and the controls applied to the public repository.
+
+## Publication record
+
+Published at <https://github.com/kevinb361/netbox-scribe> on 2026-07-21 after explicit operator approval. The initial CI run passed, `main` branch protection requires both Python matrix checks, and the annotated `v0.1.0` tag is available as a GitHub release.
 
 ## Pre-publication decisions
 

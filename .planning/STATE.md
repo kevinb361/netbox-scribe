@@ -3,9 +3,9 @@ saga_state_version: 1.0
 milestone: v0.1.1
 milestone_name: Public GitHub Readiness
 status: complete
-stopped_at: v0.1.1 independently audited PASS; awaiting explicit operator approval for GitHub publication.
-last_updated: "2026-07-22T00:35:00Z"
-last_activity: 2026-07-21 — v0.1.1 closed with 13/13 requirements PROVEN and no release-blocking audit findings.
+stopped_at: public GitHub repository and v0.1.0 release published; v0.2 remains idle.
+last_updated: "2026-07-22T01:00:00Z"
+last_activity: 2026-07-21 — published GitHub repository, protected `main`, security controls, passing CI, and the v0.1.0 release.
 ---
 
 # NetBox Scribe — State
@@ -16,7 +16,7 @@ Phase/Milestone: v0.1.1 Public GitHub Readiness
 Status: complete — independent frontier audit PASS
 Last activity: 2026-07-21 — final audit re-derived the frozen dependency audit, public-tree/history scans, CI matrix, workflow security, publication controls, and link/artifact mutation probes with zero close conditions.
 
-All 13 requirements are PROVEN. No GitHub remote, repository, or public ref has been created. The next action is the explicit operator approval checkpoint documented in `docs/PUBLICATION.md`.
+All 13 requirements are PROVEN. After explicit operator approval, the repository was published at <https://github.com/kevinb361/netbox-scribe>; `main` and the annotated `v0.1.0` tag match the locally verified refs.
 
 ## Active Work
 
@@ -26,7 +26,9 @@ All 13 requirements are PROVEN. No GitHub remote, repository, or public ref has 
 - REQ-013 locally complete — `docs/PUBLICATION.md` provides settings and commands while preserving explicit approval.
 - v0.1.1 audit verdict: **PASS** — 13/13 requirements PROVEN; 0 release-blocking findings; 0 conditions on close.
 - Final gate evidence: Python 3.11 and 3.12 each passed 39 tests; public readiness checked 45 tracked files; Gitleaks history/public-tree scans and explicit frozen dependency audit were clean.
-- Publication remains a separate live-mutation checkpoint requiring explicit operator approval; follow `docs/PUBLICATION.md` only after that approval.
+- Publication approval received and executed: public repository, `main`, annotated `v0.1.0` tag/release, topics, merge policy, security controls, and branch protection are live.
+- Initial GitHub Actions run `29875883512` passed both required Python checks.
+- v0.2 remains idle and unscoped.
 
 ## Deferred
 
