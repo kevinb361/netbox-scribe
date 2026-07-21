@@ -46,6 +46,13 @@ The system SHALL retrieve every page of device records from the read-only NetBox
 - WHEN the client follows pagination
 - THEN retrieval stops with a safe response error before credentials leave the configured origin or a loop continues
 
+#### Scenario: plaintext-token-transport
+
+- GIVEN the configured NetBox URL uses HTTP
+- WHEN an export starts without explicit insecure-transport acknowledgement
+- THEN configuration fails before any request is sent
+- AND trusted-network operators may opt in explicitly with `--allow-insecure-http`
+
 ### REQ: deterministic-canonical-device-yaml
 
 The system SHALL export normalized NetBox device records as canonical YAML with an explicit schema version.

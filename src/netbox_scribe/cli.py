@@ -43,6 +43,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("snapshot/agent/INDEX.md"),
         help="Derived Markdown agent index path (default: %(default)s)",
     )
+    export_parser.add_argument(
+        "--allow-insecure-http",
+        action="store_true",
+        help="Allow plaintext HTTP token transport on a trusted network (unsafe)",
+    )
     export_parser.add_argument("--include-field", action="append")
     export_parser.add_argument("--exclude-field", action="append", default=[])
     export_parser.add_argument("--include-custom-field", action="append", default=[])
@@ -76,7 +81,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         except ValueError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
-        return _run_export(args.output, args.agent_index, policy)
+        return _run_export(
+            args.output,
+            args.agent_index,
+            policy,
+            allow_insecure_http=args.allow_insecure_http,
+        )
     if args.command == "validate":
         return _run_validate(args.snapshot)
 
@@ -97,7 +107,13 @@ def _run_validate(snapshot: Path) -> int:
     return 0
 
 
-def _run_export(output: Path, agent_index: Path, policy: ExportPolicy) -> int:
+def _run_export(
+    output: Path,
+    agent_index: Path,
+    policy: ExportPolicy,
+    *,
+    allow_insecure_http: bool,
+) -> int:
     base_url = os.environ.get("NETBOX_URL")
     token = os.environ.get("NETBOX_TOKEN")
     if not base_url or not token:
@@ -105,7 +121,11 @@ def _run_export(output: Path, agent_index: Path, policy: ExportPolicy) -> int:
         return 2
 
     try:
-        with NetBoxClient(base_url, token) as client:
+        with NetBoxClient(
+            base_url,
+            token,
+            allow_insecure_http=allow_insecure_http,
+        ) as client:
             count = export_devices(client, output, agent_index=agent_index, policy=policy)
     except (NetBoxClientError, SnapshotValidationError, OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)

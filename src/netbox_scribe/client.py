@@ -13,6 +13,10 @@ class NetBoxClientError(RuntimeError):
     """Base class for safe, operator-facing NetBox failures."""
 
 
+class NetBoxConfigurationError(NetBoxClientError):
+    """NetBox client configuration would expose credentials or cannot be used."""
+
+
 class NetBoxAuthenticationError(NetBoxClientError):
     """NetBox rejected the configured API token."""
 
@@ -35,9 +39,20 @@ class NetBoxClient:
         *,
         transport: httpx.BaseTransport | None = None,
         timeout: float = 30.0,
+        allow_insecure_http: bool = False,
     ) -> None:
         normalized_base_url = base_url.rstrip("/") + "/"
-        base = httpx.URL(normalized_base_url)
+        try:
+            base = httpx.URL(normalized_base_url)
+        except (httpx.InvalidURL, ValueError):
+            raise NetBoxConfigurationError("NetBox URL is invalid") from None
+        if base.scheme not in {"http", "https"} or not base.host:
+            raise NetBoxConfigurationError("NetBox URL must use HTTP or HTTPS")
+        if base.scheme != "https" and not allow_insecure_http:
+            raise NetBoxConfigurationError(
+                "HTTPS is required for NetBox credentials; pass --allow-insecure-http "
+                "only for a trusted network"
+            )
         self._origin = (base.scheme, base.host, base.port)
         self._client = httpx.Client(
             base_url=normalized_base_url,
@@ -73,10 +88,12 @@ class NetBoxClient:
         return devices
 
     def _ensure_safe_next_url(self, next_url: str) -> None:
-        candidate = httpx.URL(next_url)
-        if candidate.is_relative_url:
-            return
-        if (candidate.scheme, candidate.host, candidate.port) != self._origin:
+        try:
+            candidate = self._client.base_url.join(next_url)
+            candidate_origin = (candidate.scheme, candidate.host, candidate.port)
+        except (httpx.InvalidURL, ValueError):
+            raise NetBoxResponseError("NetBox returned a malformed pagination URL") from None
+        if candidate_origin != self._origin:
             raise NetBoxResponseError("NetBox pagination points to a different origin")
 
     def close(self) -> None:

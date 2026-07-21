@@ -6,9 +6,49 @@ import pytest
 from netbox_scribe.client import (
     NetBoxAuthenticationError,
     NetBoxClient,
+    NetBoxConfigurationError,
     NetBoxResponseError,
     NetBoxTransportError,
 )
+
+
+def test_client_rejects_insecure_http_before_any_request() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200)
+
+    transport = httpx.MockTransport(handler)
+
+    with pytest.raises(NetBoxConfigurationError, match="HTTPS is required") as captured:
+        NetBoxClient("http://netbox.example", "http-secret-token", transport=transport)
+
+    assert requests == []
+    assert "http-secret-token" not in str(captured.value)
+
+
+def test_client_allows_explicit_insecure_http_override() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200,
+            json={"count": 0, "next": None, "previous": None, "results": []},
+        )
+
+    client = NetBoxClient(
+        "http://netbox.example",
+        "explicit-http-secret",
+        allow_insecure_http=True,
+        transport=httpx.MockTransport(handler),
+    )
+
+    assert client.list_devices() == []
+    assert len(requests) == 1
+    assert requests[0].url.scheme == "http"
+    assert requests[0].headers["Authorization"] == "Token explicit-http-secret"
 
 
 def test_list_devices_retrieves_every_page() -> None:
@@ -54,7 +94,17 @@ def test_list_devices_retrieves_every_page() -> None:
     )
 
 
-def test_list_devices_rejects_cross_origin_pagination_before_sending_credentials() -> None:
+@pytest.mark.parametrize(
+    "next_url",
+    [
+        "https://untrusted.example/api/dcim/devices/?offset=1",
+        "//untrusted.example/api/dcim/devices/?offset=1",
+        "http://netbox.example/api/dcim/devices/?offset=1",
+    ],
+)
+def test_list_devices_rejects_cross_origin_pagination_before_sending_credentials(
+    next_url: str,
+) -> None:
     requests: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -63,7 +113,7 @@ def test_list_devices_rejects_cross_origin_pagination_before_sending_credentials
             200,
             json={
                 "count": 1,
-                "next": "https://untrusted.example/api/dcim/devices/?offset=1",
+                "next": next_url,
                 "previous": None,
                 "results": [{"id": 1, "name": "router-01"}],
             },
@@ -79,6 +129,31 @@ def test_list_devices_rejects_cross_origin_pagination_before_sending_credentials
         client.list_devices()
 
     assert len(requests) == 1
+
+
+def test_list_devices_rejects_malformed_pagination_url_cleanly() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "count": 0,
+                "next": "https://netbox.example:bad/",
+                "previous": None,
+                "results": [],
+            },
+        )
+
+    client = NetBoxClient(
+        "https://netbox.example",
+        "malformed-next-secret",
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(NetBoxResponseError, match="malformed pagination URL") as captured:
+        client.list_devices()
+
+    assert "malformed-next-secret" not in str(captured.value)
+    assert captured.value.__cause__ is None
 
 
 def test_list_devices_rejects_repeated_pagination_url() -> None:

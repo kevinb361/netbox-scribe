@@ -56,6 +56,14 @@ Required variables:
 
 NetBox Scribe does not call write endpoints. Errors omit the token and response body. Pagination is restricted to the configured origin so a malicious `next` URL cannot receive credentials.
 
+HTTPS is required by default because every API request carries the token. For an isolated, trusted network where TLS is unavailable, HTTP requires explicit acknowledgement:
+
+```bash
+nbscribe export --allow-insecure-http
+```
+
+This override sends the token in plaintext and must not be used across untrusted networks.
+
 ## Export
 
 ```bash

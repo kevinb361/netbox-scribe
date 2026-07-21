@@ -12,6 +12,7 @@ from typing import cast
 import pytest
 import yaml
 
+from netbox_scribe import __version__
 from netbox_scribe.cli import main
 
 
@@ -36,6 +37,7 @@ def test_version_does_not_require_netbox_credentials(
     exit_code = main(["--version"])
 
     assert exit_code == 0
+    assert __version__ == "0.1.0"
     assert re.fullmatch(r"nbscribe \d+\.\d+\.\d+(?:\.dev\d+)?\n", capsys.readouterr().out)
 
 
@@ -72,6 +74,7 @@ def test_export_command_writes_canonical_yaml(
         monkeypatch.setenv("NETBOX_TOKEN", "cli-test-secret")
         command = [
             "export",
+            "--allow-insecure-http",
             "--output",
             str(output),
             "--agent-index",
@@ -113,14 +116,14 @@ def test_export_command_writes_canonical_yaml(
     assert "cli-denied-description" not in combined_output
     assert "cli-denied-secret" not in combined_output
     assert "cli-test-secret" not in combined_output
-    assert agent_index.read_text() == """# NetBox Scribe Agent Index
+    assert agent_index.read_text() == f"""# NetBox Scribe Agent Index
 
 > Generated view. Canonical inventory remains authoritative.
 
 - Source: NetBox
 - Source freshness: 2026-07-21T18:00:00Z
 - Schema version: 1
-- Exporter version: 0.1.0.dev0
+- Exporter version: {__version__}
 - Canonical inventory: [devices.yaml](../inventory/devices.yaml)
 
 ## Devices (1)
@@ -146,7 +149,16 @@ def test_export_command_handles_unnamed_device_without_traceback(
     with _netbox_server(payload) as base_url:
         monkeypatch.setenv("NETBOX_URL", base_url)
         monkeypatch.setenv("NETBOX_TOKEN", "unnamed-test-secret")
-        exit_code = main(["export", "--output", str(output), "--agent-index", str(index)])
+        exit_code = main(
+            [
+                "export",
+                "--allow-insecure-http",
+                "--output",
+                str(output),
+                "--agent-index",
+                str(index),
+            ]
+        )
 
     captured = capsys.readouterr()
     assert exit_code == 0
@@ -154,6 +166,33 @@ def test_export_command_handles_unnamed_device_without_traceback(
     assert "`device-7` — NetBox ID 7" in index.read_text()
     assert "Traceback" not in captured.err
     assert "unnamed-test-secret" not in captured.out + captured.err
+
+
+def test_export_command_rejects_http_without_explicit_override(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output = tmp_path / "inventory/devices.yaml"
+    index = tmp_path / "agent/INDEX.md"
+    output.parent.mkdir()
+    index.parent.mkdir()
+    output.write_text("last-valid-canonical\n")
+    index.write_text("last-valid-index\n")
+    monkeypatch.setenv("NETBOX_URL", "http://127.0.0.1:9")
+    monkeypatch.setenv("NETBOX_TOKEN", "http-cli-secret")
+
+    exit_code = main(["export", "--output", str(output), "--agent-index", str(index)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "HTTPS is required" in captured.err
+    assert "--allow-insecure-http" in captured.err
+    assert "http-cli-secret" not in captured.out + captured.err
+    assert output.read_text() == "last-valid-canonical\n"
+    assert index.read_text() == "last-valid-index\n"
+    assert list(output.parent.iterdir()) == [output]
+    assert list(index.parent.iterdir()) == [index]
 
 
 def test_export_command_reports_filesystem_failure_without_traceback(
@@ -175,7 +214,16 @@ def test_export_command_reports_filesystem_failure_without_traceback(
     with _netbox_server(payload) as base_url:
         monkeypatch.setenv("NETBOX_URL", base_url)
         monkeypatch.setenv("NETBOX_TOKEN", "filesystem-test-secret")
-        exit_code = main(["export", "--output", str(output), "--agent-index", str(index)])
+        exit_code = main(
+            [
+                "export",
+                "--allow-insecure-http",
+                "--output",
+                str(output),
+                "--agent-index",
+                str(index),
+            ]
+        )
 
     captured = capsys.readouterr()
     assert exit_code == 1
