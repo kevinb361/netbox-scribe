@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kevin Default Interface component seed</title>
+  <link rel="stylesheet" href="./tokens.css" />
+  <style>
+    main { max-width: 1120px; margin: 0 auto; padding: 24px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+    .card { padding: 14px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .muted { color: var(--text-muted); }
+    .badge-ok, .badge-warning, .badge-danger { border: 1px solid; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
+    pre { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="mono muted">DESIGN.md / component smoke seed</p>
+    <h1>Quiet operational interface</h1>
+    <p class="muted">Use this page to sanity-check colors, spacing, focus states, and action severity before wiring real UI.</p>
+    <section class="grid">
+      <article class="card">
+        <h2>Status</h2>
+        <p class="muted">Badges are calm but unambiguous.</p>
+        <div class="row">
+          <span class="badge-ok">healthy</span>
+          <span class="badge-warning">degraded</span>
+          <span class="badge-danger">critical</span>
+        </div>
+      </article>
+      <article class="card">
+        <h2>Actions</h2>
+        <p class="muted">Danger is visually separated from routine work.</p>
+        <div class="row">
+          <button class="button-primary">Run check</button>
+          <button class="button-warning">Snooze</button>
+          <button class="button-danger">Delete</button>
+        </div>
+      </article>
+      <article class="card">
+        <h2>Form</h2>
+        <label class="muted" for="query">Query</label><br />
+        <input id="query" value="host:pantera status:live" />
+      </article>
+    </section>
+    <pre class="mono">2026-07-12T00:00:00Z service=example status=healthy latency_ms=42</pre>
+  </main>
+</body>
+</html>

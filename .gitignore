@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Local configuration and generated inventory
+.env
+.env.*
+!.env.example
+config.yaml
+snapshot/
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store

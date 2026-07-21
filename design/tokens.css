@@ -1,0 +1,86 @@
+/* Kevin Default Interface seed tokens.
+   Import/copy into the app stylesheet, then adapt names to the project's CSS convention. */
+:root {
+  color-scheme: dark;
+  --bg: #0a0d0b;
+  --bg-elevated: #0d1117;
+  --surface: #111511;
+  --surface-raised: #161b22;
+  --surface-card: #1c2128;
+  --border: #263026;
+  --border-strong: #30363d;
+  --text: #d8e0d5;
+  --text-muted: #a8b995;
+  --text-bright: #f0f6ec;
+  --primary: #8faf6a;
+  --primary-bright: #b8d989;
+  --warning: #c79545;
+  --danger: #a3473e;
+  --link: #6f9a9a;
+  --shadow: rgba(0, 0, 0, 0.42);
+  --font-ui: Inter, Geist, IBM Plex Sans, system-ui, sans-serif;
+  --font-mono: JetBrains Mono, IBM Plex Mono, SFMono-Regular, Consolas, monospace;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at top left, rgba(143, 175, 106, 0.07), transparent 32rem), var(--bg);
+  color: var(--text);
+  font: 14px/1.5 var(--font-ui);
+}
+
+.panel,
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+}
+
+.button,
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.button,
+button {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text);
+  padding: 8px 12px;
+}
+
+.button-primary { border-color: color-mix(in srgb, var(--primary) 60%, var(--border)); color: var(--text-bright); }
+.button-warning { border-color: color-mix(in srgb, var(--warning) 70%, var(--border)); color: var(--warning); }
+.button-danger { border-color: color-mix(in srgb, var(--danger) 70%, var(--border)); color: var(--danger); }
+
+input,
+select,
+textarea {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 8px 10px;
+}
+
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 72%, transparent);
+  outline-offset: 2px;
+}
+
+.badge-ok { color: var(--primary); border-color: var(--primary); }
+.badge-warning { color: var(--warning); border-color: var(--warning); }
+.badge-danger { color: var(--danger); border-color: var(--danger); }
+.mono { font-family: var(--font-mono); }
