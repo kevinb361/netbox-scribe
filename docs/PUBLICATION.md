@@ -9,6 +9,7 @@ The operator must explicitly resolve these items:
 1. **History identity:** the five commits through `v0.1.0` expose the maintainer name and Gmail address in Git metadata, and each revision contains an obsolete local profile path in `DESIGN.md`. The prepared `DESIGN.md` removes the path, while tracked audit/traceability evidence quotes it when documenting the review; a full-history mirror also retains the original file content in earlier revisions. Neither disclosure is a credential or infrastructure detail; both become permanent public history if mirrored.
 2. **Project name:** no published NetBox trademark-usage policy was located during the readiness review. Keep the README's independent-project disclaimer. Confirm naming with NetBox Labs before package publication if greater certainty is required.
 3. **Package reservation:** PyPI returned 404 for `netbox-scribe` during review. Availability is not reservation; package publication is a separate approval and credentialed workflow.
+4. **Planning evidence:** the complete tracked `.planning/` directory is part of the public tree, including decision, audit, and traceability history. Review it as public project documentation rather than treating it as local agent state.
 
 Preserving the annotated `v0.1.0` tag requires publishing its reachable history. Do not use a squashed import unless intentionally replacing public release history and tags.
 
@@ -70,8 +71,8 @@ After the first push:
 
 - Gitleaks 8.30.1 scanned the complete reachable history with no findings.
 - A full-history regex scan found no credentials or private IP addresses.
-- `pip-audit --strict` reported no known vulnerabilities.
+- `uv export --frozen --all-groups --no-emit-project -o /tmp/nbscribe-requirements.txt` followed by `uvx pip-audit --strict -r /tmp/nbscribe-requirements.txt` reported no known vulnerabilities.
 - Real snapshots, `.env`, build output, caches, and close-out logs are ignored and untracked.
 - GitHub workflow syntax and permissions were checked against current GitHub documentation.
 - Workflow action versions were checked against their current signed releases before pinning.
-- `make ci` runs a public-readiness check for required tracked policies, forbidden generated paths, local-profile leakage in `DESIGN.md`, and broken local Markdown links.
+- `make ci` runs a public-readiness check for required tracked policies, forbidden generated paths, local-profile leakage in `DESIGN.md`, and broken or untracked local Markdown links.

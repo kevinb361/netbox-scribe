@@ -1132,3 +1132,385 @@ audit's findings and the previous one's (**E4**), and fill the `<repository-url>
 Per instruction, this audit did not edit `ROADMAP.md` or `STATE.md`, created no remote or public resource,
 pushed nothing, and rewrote no history. It wrote `.planning/TRACEABILITY.md` and this section only, and
 committed nothing.
+
+---
+
+## Audit: v0.1.1 Public GitHub Readiness — 2026-07-21 (post-remediation re-audit at `5c31f27`)
+
+Auditor: Claude Opus 4.8 (`claude-opus-4-8`, 1M context) via Claude Code — independent re-audit of the
+committed tree after the E1/E2 wording corrections and the E4 mechanical gate. Supersedes nothing; the
+`3318077` entry above stands as the record of that commit.
+Scope: v0.1.1 Public GitHub Readiness — public-safety audit, GitHub CI, security/contribution policy, and
+publication handoff (REQ-010..REQ-013).
+Files reviewed: since `v0.1.0` (`a71831f`) — **14 files changed, 1014 insertions(+), 84 deletions(-)**.
+Since the previous audited commit `3318077` — **6 files changed, 464 insertions(+), 84 deletions(-)**
+(`.planning/AUDIT.md`, `.planning/STATE.md`, `.planning/TRACEABILITY.md`, `Makefile`,
+`docs/PUBLICATION.md`, `scripts/check_public_readiness.py`). Under the 50-file single-pass limit.
+
+Method: no claim in this section is inherited from a prior audit section or from `TRACEABILITY.md`. The two
+corrected sentences were checked against the repository state they describe rather than read for plausibility.
+The new gate was **mutation-probed across 14 cases in a throwaway `git clone --no-hardlinks` of `5c31f27`**,
+never in the working repository, and its coverage boundaries were mapped by deliberately constructing the
+cases it does _not_ catch. Security substance was re-derived from scratch: Gitleaks over both full history
+and the materialized public tree, an independent credential-shape grep across every reachable commit, a
+targeted search for 25 real private strings, a frozen-export dependency audit, live GitHub-API resolution of
+both action pins, `zizmor` at `--persona=auditor` on two versions including one run online with a token, and
+both CI matrix legs end to end. Nothing was committed, pushed, or created.
+
+`.planning/config.json` carries a populated `close_out_auditor` key — no WARN.
+
+`make ci` this session: black clean (**16** files — `scripts/check_public_readiness.py` is now in black's
+scope), ruff clean, mypy clean (15 source files), `pytest -n auto` → **39 passed**, `public-check` →
+_Public readiness checks passed (45 tracked files)_. **The checker passes with itself tracked**, which is the
+non-trivial half of that claim: it walks `git ls-files`, and `scripts/check_public_readiness.py` is in that
+set.
+
+### Prior conditions on close — status
+
+| ID      | Condition from the `3318077` audit                                                                                                      | Status this pass                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **E1**  | Amend `docs/PUBLICATION.md` §1 to note the obsolete path also remains quoted in tracked audit records                                   | **FIXED & independently verified.** §1 now reads "The prepared `DESIGN.md` removes the path, while tracked audit/traceability evidence quotes it when documenting the review; a full-history mirror also retains the original file content in earlier revisions." Checked against reality rather than accepted: `DESIGN.md` carries the literal twice in each of the five commits `217d2b0`, `1e07d2a`, `4b4e41e`, `2332025`, `a71831f`, and **zero** times at `3318077` and at `5c31f27`; at `HEAD` the literal survives in exactly one tracked file, `.planning/AUDIT.md` (5 occurrences), while `TRACEABILITY.md` carries only the redacted form. The new wording is therefore accurate and, if anything, errs one notch _toward_ overstating exposure — which is the correct direction for an acceptance gate |
+| **OP1** | Same sentence: state that `.planning/` publishes in full                                                                                | **NOT DONE.** No sentence in `docs/PUBLICATION.md` says the planning directory publishes in its entirety. "Tracked audit/traceability evidence" implies it to a careful reader and is not inaccurate, but the ~1,400 lines of self-critique that ship as public content are still never named as a decision. Non-blocking; see **F1**                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **E2**  | Restate the Gitleaks evidence claim against all reachable commits rather than a frozen count of five                                    | **FIXED & independently verified.** The bullet now reads "Gitleaks 8.30.1 scanned the complete reachable history with no findings" — no count to go stale. Re-executed: **7 commits, 436.52 KB, no leaks**. The sentence is now true and stays true as commits land, which was the actual defect                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **E3**  | Record the explicit `pip-audit --strict -r <frozen export>` form                                                                        | **NOT DONE.** `docs/PUBLICATION.md:73` still records the bare `pip-audit --strict`. Re-run correctly this session against `uv export --frozen` (505 lines) → _no known vulnerabilities_. See **F2** — this is the one residual worth a condition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **E4**  | Add the link-and-tracked-artifact check that would have caught this audit's findings and the previous one's (recommended, not blocking) | **DONE, and stronger than recommended.** Delivered as `scripts/check_public_readiness.py` wired into `make ci` via a `public-check` target, so it runs on both CI matrix legs, not only locally. Mutation-proven across 14 cases — see Test Coverage. It enforces four distinct properties, three more than the "dozen-line test" the recommendation asked for                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| **E5**  | Prior `AUDIT.md` line 609 contradicts its own commit (info; no edit expected)                                                           | **Resolved as expected.** No edit was made to the historical section, which is correct — dated audit records are historical documents. The `3318077` section resolves it in prose and this section carries it no further                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **C1**  | Fill the `<repository-url>` placeholder and the missing `git clone` line once the real URL exists                                       | **Carried, unchanged and correctly deferred.** `README.md:31-34` still opens with `uv tool install .` with no preceding clone; `CONTRIBUTING.md:11` still has the literal `git clone <repository-url>`. Both are blocked on a URL that by design does not exist yet, and `docs/PUBLICATION.md` already schedules the patch                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+
+### Correctness
+
+- [warning] **F2 — the documented dependency-audit command still no-ops if re-run literally.**
+  `docs/PUBLICATION.md:73` records `pip-audit --strict` with no `-r` or `-e`. Invoked exactly as written it
+  audits whatever environment happens to be active, which for a reader following the handoff is very likely
+  not the project's locked set. The underlying fact is not in doubt — this session re-ran the correct form,
+  `pip-audit --strict -r` against a 505-line `uv export --frozen`, and got _no known vulnerabilities_ — so
+  the risk is not a hidden vulnerability today. The risk is that a verification step whose recorded form
+  cannot fail is not a verification step. This is the third consecutive audit to find a static sentence in
+  this document out of step with what it claims, and it is the residual clause of the prior pass's own
+  condition 2. Fix is the argument: `pip-audit --strict -r <(uv export --frozen)`, or the two-line form.
+
+- [info] **F1 — `.planning/` still publishes in full without the handoff ever saying so.**
+  Standing since **OP1** two audits ago. At `HEAD` the planning spine is ~1,400 lines of `AUDIT.md` plus
+  `TRACEABILITY.md`, `SPEC.md`, `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md`, and two decision records, all
+  tracked and all public on push. That includes this section, including its own criticisms, including the
+  deferred-and-still-unfixed items listed in `STATE.md` (redirect diagnostics, output/index path collisions,
+  extreme YAML nesting, malformed-endpoint diagnostics). For a pre-alpha tool the transparency is defensible
+  and arguably an asset — the point is that it should be a recorded decision in the operator's pre-publication
+  checklist rather than a side effect of what happens to be tracked. One sentence in §1.
+
+- [info] **F3 — README's install path still assumes a clone it never instructs.** Verbatim carry of **C1**.
+  Re-confirmed at `README.md:31-34` and `CONTRIBUTING.md:11`. Correctly deferred to the URL-fill patch.
+
+- [info] **F4 — the handoff's ref-verification commands print rather than assert.**
+  `docs/PUBLICATION.md` verifies the push with `git rev-parse main github/main` and
+  `git rev-parse v0.1.0 github/v0.1.0^{}`, which emit two SHAs each and leave the comparison to the reader's
+  eye. The preceding command block sets the precedent for doing better — `test -z "$(git status --porcelain)"`
+  is a real assertion that exits non-zero. A `test "$(git rev-parse main)" = "$(git rev-parse github/main)"`
+  form would match it. Cosmetic relative to F2; noted because the same document already demonstrates the
+  better pattern one section earlier.
+
+### Safety
+
+- [info] **G1 — no secret, credential, or private-infrastructure disclosure. Re-derived, not re-read.**
+  Gitleaks 8.30.1 over `--log-opts="--all"`: **7 commits, 436.52 KB, no leaks** — now including `5c31f27`,
+  the commit that introduces the gate script itself. Gitleaks over the materialized public tree (44 regular
+  files + the `AGENTS.md` symlink): 362.01 KB, no leaks. Neither result is suppressed: no `.gitleaksignore`,
+  `gitleaks.toml`, `.gitleaks.toml`, or `.secretsignore` exists in the working tree or anywhere in
+  `git ls-files`. An independent `git grep -E` across every reachable commit for `ghp_`/`gho_`/`ghu_`/`ghs_`/
+  `ghr_`, `github_pat_`, `AKIA[0-9A-Z]{16}`, PEM private-key headers, `Bearer <20+>`, and `Token <hex40>`
+  matched **only audit prose enumerating those patterns** — not a single literal. A full-history grep for
+  RFC1918 and `172.16/12` address literals returned **0 matches across all 7 commits**.
+  The decisive check is again the targeted one, not the scanner: 25 candidate private strings pulled
+  programmatically from `.env` and the live untracked dogfood snapshot — the `NETBOX_URL`, its host literal,
+  the 40-character `NETBOX_TOKEN`, every real device name — were searched against the full public-tree corpus
+  and against `git log --all -p` (7,009 lines / 563,793 chars), with values compared in memory and never
+  printed. Exactly **4** matched, all generic vendor/role vocabulary: `Router`, `Switch`, `Server`, `Ruckus`.
+  **The token, the URL, and the host literal matched nothing in either corpus.** Scanners find secret
+  _shapes_; this finds the specific private strings this project has actually handled.
+
+- [info] **G2 — the obsolete profile path is where the corrected §1 says it is.** Per-commit count of the
+  literal in `DESIGN.md`: `217d2b0` 2, `1e07d2a` 2, `4b4e41e` 2, `2332025` 2, `a71831f` 2, `3318077` **0**,
+  `5c31f27` **0**. At `HEAD`, `git grep -c` across the whole tree finds it in exactly one file,
+  `.planning/AUDIT.md` (5 occurrences), all inside sections analyzing the disclosure. On merits it remains
+  what two prior passes judged it: a local username and a dotfile name — no host, no address, no credential.
+
+- [info] **G3 — ignore rules demonstrated, not assumed.** `git ls-files -i -c --exclude-standard` is empty.
+  `git ls-files --others --exclude-standard` returns **0** — the tracked set and the working set now agree
+  exactly, so nothing is sitting untracked waiting to be swept in. `git check-ignore -v` attributes each
+  sensitive path to a specific rule: `.env`→`.gitignore:15`, `dist`→`:11`, `snapshot`→`:19`,
+  `.planning/.close-out-auditor.log`→`:20`. Live `snapshot/` artifacts are mode `0600` and untracked. The
+  publishable set is 45 paths, up 1 from the prior pass's 44 — exactly the gate script, nothing else.
+
+- [info] **G4 — the mechanical gate now enforces three of these properties instead of trusting them.**
+  What was previously an auditor's `check-ignore` transcript is now a `make ci` failure: `.env`,
+  `dist/`, `snapshot/`, and `.planning/.close-out-auditor.log` becoming tracked each fail the build. This is
+  the substantive security improvement in `5c31f27` — the ignore rules had a second line of defense only as
+  long as someone ran an audit. Note the scope boundary, which is correct: the checker guards against these
+  paths being _tracked_, not against `.gitignore` being weakened, since a weakened ignore rule only matters
+  once something is actually added.
+
+- [info] **G5 — the approval gate remains procedural, not technical.** Unchanged and worth restating because
+  it is why document accuracy is the real control here. The local `gh` CLI is authenticated as `kevinb361`
+  with a token carrying repo scope; nothing in this environment technically prevents an agent or script with
+  shell access from creating the repository and pushing. The controls that exist are the operator's reading
+  of `docs/PUBLICATION.md` and the absence of a GitHub remote.
+
+- [info] **G6 — the private mirror is now two commits behind local `main`.** `refs/remotes/origin/main` is
+  `a71831f` (= `v0.1.0`) while `refs/heads/main` is `5c31f27`; neither `3318077` nor `5c31f27` has been
+  pushed to Gitea. Correct for an audit told to push nothing, and harmless for the documented procedure,
+  which mirrors from this working clone. It matters in exactly one scenario, now one commit worse than last
+  pass: mirroring to GitHub _from the Gitea copy_ would publish the `a71831f` tree — no CI, no `SECURITY.md`,
+  no `CONTRIBUTING.md`, no gate script, and a `DESIGN.md` still carrying the obsolete path. Worth one line in
+  the handoff if that path is ever considered.
+
+- [info] **G7 — `AGENTS.md` publishes as a symlink to `CLAUDE.md`.** Tracked as mode `120000` and
+  materialized as a symlink by `git archive`. GitHub renders it as a link rather than following it. Harmless,
+  but it means `CLAUDE.md` — the project's internal agent instructions — is unavoidably part of the published
+  surface. Re-verified public-safe this pass: it contains no IPs, hostnames, employer names, or credentials.
+
+### Test Coverage
+
+- [info] **H1 — the new gate was proven by mutation, and it holds.** Fourteen cases in a throwaway clone of
+  `5c31f27`. Required-artifact enforcement: untracking `SECURITY.md` → `required public artifact is not
+tracked: SECURITY.md`, exit 1. Forbidden-path enforcement: force-adding `.env`, `dist/wheel.txt`,
+  `snapshot/inventory/devices.yaml`, and `.planning/.close-out-auditor.log` each → `sensitive/generated path
+is tracked: <path>`, exit 1. `DESIGN.md` enforcement: appending an absolute local path fails, and appending
+  only a `~/.agent-profile/…` reference **also** fails — so both halves of the disjunction at
+  `check_public_readiness.py:34` are live, not one dead branch riding on the other. Link enforcement: a broken
+  relative link in `README.md` fails by name and target, and so does one buried in the 1,100-line
+  `.planning/AUDIT.md`, so large tracked files are genuinely walked rather than skipped.
+
+- [info] **H2 — valid links are not masked, and findings do not short-circuit.** The two properties the
+  request singled out, both probed directly. Adding five valid links (relative, `#anchor`, `https://`,
+  `mailto:`, and a `#fragment`-suffixed relative path) alongside one broken link produced findings for the
+  broken targets **only** — no false positive on any valid form, and fragment-stripping before resolution
+  works. Separately, mutating four failure classes simultaneously (untracked `LICENSE`, tracked `.env`,
+  `DESIGN.md` path, broken link) reported **all four in one run** before exiting 1: `findings` accumulates
+  and is printed in full, so a first failure never hides the rest. Independently of the checker, all **7**
+  local Markdown link targets in the tracked tree were re-resolved this session — including reference-style
+  and raw-HTML forms the checker does not parse — and every one resolves to a **tracked** path. The gate and
+  the independent walk agree.
+
+- [warning] **N1 — the checker validates filesystem existence, not tracked-ness, which is a weaker
+  property than its own purpose.** `_broken_local_links` resolves each target and calls `.exists()`. Two
+  probe-confirmed consequences: a link to `snapshot/inventory/devices.yaml` — present on the developer's
+  disk, gitignored, and absent from every public clone — **passes**; and a link to an absolute path such as
+  `/etc/hostname` **passes** because `pathlib` lets an absolute component override the base, and the file
+  happens to exist on the runner. Both forms are green locally and 404 for every public reader, which is
+  precisely the class of defect this script exists to prevent. No live instance exists at `HEAD` — the
+  independent walk in **H2** confirms all 7 targets are tracked — so this is a latent gap, not a current
+  break. The fix is roughly one line, replacing the existence test with membership in the `tracked` set the
+  function already receives as an argument and currently only uses to enumerate Markdown files.
+
+- [info] **N2 — `scripts/` sits outside `mypy`'s configured scope.** `pyproject.toml:56` pins
+  `files = ["src", "tests"]`, so `make type` reports 15 source files and never sees the gate script, even
+  though `make ci` executes it. black and ruff use default discovery and do cover it — which is why the black
+  count moved 15 → 16 and nobody noticed the typing hole. Pointed at explicitly, the script passes
+  `mypy --strict` cleanly today; the gap is that nothing keeps it that way. One-word fix:
+  `files = ["src", "tests", "scripts"]`.
+
+- [info] **N3 — the checker raises an uncaught traceback outside a Git checkout.** Run inside the
+  materialized `git archive` tree — i.e. a source tarball, which is exactly how a sdist consumer receives
+  this project — `subprocess.run(..., check=True)` raises `CalledProcessError` and prints a stack trace
+  rather than a bounded message. It still exits non-zero, so `make ci` fails correctly; the defect is
+  operability, not correctness, and it is a two-line `try/except` producing something like
+  `public-readiness error: not a Git checkout`. Note the irony: the rest of this codebase is unusually
+  disciplined about bounded operator errors — `cli.py` catches `UnicodeError` specifically to avoid exactly
+  this shape — so the gate script is the one file that does not follow the project's own convention.
+
+- [warning] **N4 — Markdown links inside fenced code blocks are checked as if they were real, and this
+  audit reproduced it accidentally.** The regex at `check_public_readiness.py:23` is applied to raw file
+  text with no fence awareness, so an inline link written as an _example_ is resolved as a _reference_.
+  Probed deliberately: a fenced `[example]` + `(does-not-exist.md)` pair fails the gate. It then happened
+  for real — the first draft of this very finding embedded that example verbatim in prose, and
+  `make ci` failed with `broken local link in .planning/AUDIT.md: does-not-exist.md`. That is the strongest
+  available evidence that the false positive is reachable in practice rather than theoretical: the file that
+  documents the gap tripped the gap. The workaround is to write example targets inside angle brackets, which
+  `:38` skips — this finding now does. No unintended instance exists in the tracked tree at `HEAD`. Upgraded
+  from info because the tree is documentation-heavy, `.planning/` is walked in full, and the failure mode is
+  a build break on prose rather than on code.
+
+- [info] **N5 — reference-style and raw-HTML links are not parsed.** `[ref]: does-not-exist.md` and
+  `<a href="does-not-exist.md">` both pass. The single inline-link regex is a reasonable scope choice for a
+  60-line script and the tracked tree uses no other form; recorded so the coverage boundary is documented
+  rather than assumed. The independent walk in **H2** covered all three forms and found nothing.
+
+- [info] **N6 — `DESIGN.md` is read unconditionally but is not in `REQUIRED`.** Deleting it produces a
+  `FileNotFoundError` traceback rather than a finding. Same two-line fix family as **N3**; adding the path to
+  `REQUIRED` would also close it, though `DESIGN.md` is arguably not a required _public_ artifact.
+
+- [info] **H3 — the pre-existing public-safety test still runs in the gate on both legs.**
+  `tests/test_examples.py::test_public_docs_and_examples_contain_no_private_networks_or_credentials` and
+  `test_synthetic_example_outputs_match_production_export` both execute under `pytest -n auto` on 3.11 and
+  3.12, so the docs/examples invariant and the committed-example byte contract regress loudly. The new
+  checker complements these rather than duplicating them — it guards tracked-ness and links, they guard
+  content.
+
+- [info] **H4 — the gate script itself has no unit tests.** Deliberate and defensible at 60 lines with no
+  branching logic worth pinning, and this pass substituted 14 behavioral probes for them. Recorded only
+  because the probes live in this document and a scratch directory rather than in `tests/`, so the next
+  change to the script has no regression net. If `N1` gets fixed, that edit is the natural moment to add
+  three or four cases.
+
+### Architecture Fit
+
+- [info] **AR1 — the workflow re-audited clean, and both pins are still current.** SHAs re-resolved against
+  the live GitHub API rather than eyeballed: `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` →
+  `refs/tags/v7.0.1` exactly, still the latest release (published 2026-07-20);
+  `astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9` → `refs/tags/v9.0.0` exactly, still the
+  latest (published 2026-07-21). Top-level `permissions: contents: read`, no job-level widening, no
+  `pull_request_target`, no `secrets` reference, `persist-credentials: false`, `concurrency` with
+  `cancel-in-progress`, `timeout-minutes: 10`, `UV_FROZEN: "1"`, `uv sync --frozen --dev`.
+  `zizmor --persona=auditor` → **no findings**, run twice: 1.27.0 to match the prior pass, and **1.28.0 in
+  online mode with a GitHub token**, which enables audits that offline mode silently skips. `yamllint -d
+relaxed` → one 82-char line at `ci.yml:36`, nothing else. The workflow remains the strongest artifact in
+  this milestone.
+
+- [info] **AR2 — a note on the audit toolchain, not the project.** `zizmor` **1.27.0 — the exact version
+  every prior audit of this project used — is now yanked from PyPI** under advisory GHSA-f42p-wjw5-97qh.
+  That does not retroactively invalidate the earlier clean results, and re-running 1.28.0 online reproduces
+  **no findings**, so the conclusion is unchanged. Recorded so that "zizmor 1.27.0 clean" in the earlier
+  sections is not later mistaken for a current, reproducible claim.
+
+- [info] **AR3 — `public-check` is wired at the right level.** It is a `make ci` prerequisite, not a separate
+  CI step, so it runs identically in the local gate and on both GitHub matrix legs (`run: make ci`) with no
+  second place to keep in sync. Both legs were reproduced this session: **3.11.14 → 39 passed**, gate clean,
+  45 tracked files; **3.12.3 → 39 passed**, gate clean, 45 tracked files, executed inside an isolated clone
+  containing no `.env`, no `snapshot/`, no `dist/`, and no caches — so the second run doubles as a
+  self-sufficiency proof that the published tree builds, type-checks, tests, and self-audits alone.
+
+- [info] **AR4 — job names and branch protection still agree.** `name: Python ${{ matrix.python-version }}`
+  renders `Python 3.11` and `Python 3.12`, verbatim the required checks named in `docs/PUBLICATION.md`.
+
+- [info] **AR5 — dependency licensing re-checked and clean for MIT redistribution.** Runtime tree: httpx,
+  httpcore, idna BSD-3-Clause; jsonschema, PyYAML, h11, anyio, attrs, referencing, rpds-py,
+  jsonschema-specifications MIT; typing-extensions PSF-2.0; certifi MPL-2.0. Dev-only additions carry
+  MIT/BSD/Apache-2.0 plus `pathspec` (MPL-2.0, a `black` dependency). Neither MPL-2.0 package is vendored or
+  modified, so no source-disclosure obligation attaches. `pip-audit --strict -r` against a 505-line
+  `uv export --frozen` → _no known vulnerabilities_.
+
+### Operability
+
+- [info] **OP-A — this audit's own outputs leave the tree dirty, by design.** Writing
+  `.planning/TRACEABILITY.md` and this section makes `git status --porcelain` non-empty, so
+  `docs/PUBLICATION.md`'s clean-tree precondition will fail until these records are committed. That is the
+  precondition working, not a defect — but it means the publication sequence is: commit these audit records,
+  then publish. The audit that verifies a commit cannot be inside it. Per instruction, nothing was committed.
+
+- [info] **OP-B — the clean-tree check is deliberately absent from the mechanical gate, and that is right.**
+  The prior pass's **E4** suggested the automated test assert `git status --porcelain` empty. The
+  implementer did not, and shouldn't have: every developer run and every CI run on a PR branch would fail.
+  The clean-tree assertion belongs where it already lives — inside the publication command block at
+  `docs/PUBLICATION.md`, as a real `test -z` that exits non-zero at the moment it matters. The gate checks
+  the four properties that are true at all times; the handoff checks the one that is only true at publish
+  time. Correct split.
+
+- [info] **OP-C — the approval gate holds, verified read-only.** `git remote -v` → one remote,
+  `origin → gitea:kevin/netbox-scribe.git` (private self-hosted Gitea over SSH). `git for-each-ref` → exactly
+  three refs: `refs/heads/main 5c31f27`, `refs/remotes/origin/main a71831f`, `refs/tags/v0.1.0 dd5f4c5`
+  (annotated, → `a71831f`). `gh api repos/kevinb361/netbox-scribe` → **HTTP 404**, as do
+  `kevin-blalock/netbox-scribe` and `kevinblalock/netbox-scribe`. `gh search repos "netbox-scribe"` → **0
+  results**; the broader `netbox scribe` → **0 results**; both sanity-checked against `gh search repos
+"netbox"`, which returns the expected upstream projects, so the empty results are real rather than a
+  silently failing command. PyPI `netbox-scribe` → **HTTP 404**, still unclaimed. No GitHub repository, no
+  GitHub remote, no public ref, nothing pushed anywhere — including to Gitea.
+
+### ASSERTED Items from TRACEABILITY.md
+
+- None. This session's `/saga-verify` pass classifies all 13 requirements **PROVEN**, with v0.1.1's four at
+  **PROVEN 4 · ASSERTED 0 · OPEN 0 · WAIVED 0**. Every v0.1.1 evidence artifact was re-executed against the
+  committed tree at `5c31f27`. REQ-013 remains PROVEN with the two unwritten clauses (**F1**, **F2**)
+  recorded here as follow-ups rather than as a status downgrade: its named artifact exists, names every
+  required setting and command, and its approval gate demonstrably holds.
+
+### Release-blocking vs. optional
+
+Stated explicitly, because the residual list is long and almost none of it blocks anything:
+
+**Release-blocking correctness or security findings: 0.** Nothing found this pass makes the tree at
+`5c31f27` unsafe or incorrect to publish. The secret, privacy, dependency, license, workflow-security, and
+approval-gate substance was re-derived independently and is clean. Both prior conditions' substantive halves
+(**E1**, **E2**) are fixed and verified against the repository state they describe.
+
+**One condition worth holding for: F2.** A verification step whose documented form cannot fail is not a
+verification step. It is a one-clause edit to a document whose accuracy _is_ the control for this milestone,
+and it is the unfinished half of the prior pass's own condition 2.
+
+**Optional follow-ups, none blocking:** **N1** (tracked-ness vs. existence in the link check — the one with
+real latent value), **N4** (fence-aware link scanning — the only finding this audit reproduced by accident),
+**N2** (mypy scope), **N3**/**N6** (bounded errors in the gate script), **F1** (state that `.planning/`
+publishes in full), **F4** (assert rather than print the ref comparison), **H4** (tests for the gate script),
+**N5** (documented coverage boundary), **F3**/**C1** (URL fill, blocked on a URL that does not exist yet),
+**G6** (a line about never mirroring from Gitea).
+
+No finding in this section is stylistic. Formatting, prose quality, and structural preferences were
+deliberately not raised.
+
+### Verdict
+
+**CONDITIONAL**
+
+- Critical findings: **0**
+- Release-blocking findings: **0**
+- Warnings: **3** (F2, N1, N4)
+- Info: **18** (F1, F3, F4, G1–G7, H1–H4, N2, N3, N5, N6, AR1–AR5, OP-A–OP-C)
+
+Active counts — Warnings 3 · Info 18 · Conditions on close 1 · Release-blocking 0.
+
+Rationale: the remediation did what it was supposed to do, and the part that mattered most was the part
+that was only _recommended_. `5c31f27` converts three previously auditor-verified properties into build
+failures: required public artifacts must stay tracked, forbidden generated paths must stay untracked, and
+`DESIGN.md` must stay free of local profile paths — plus a fourth, link integrity, that neither prior audit
+had any mechanical coverage for. It runs inside `make ci`, so it executes on both GitHub matrix legs rather
+than only when someone remembers, and it passes with itself in the tracked set. Fourteen mutation probes in
+a scratch clone confirm each rule fires on its own, that valid relative, anchor, fragment, `https://`, and
+`mailto:` links are not masked, and that four simultaneous failures all report before exit. This closes the
+loop that produced findings in two consecutive audits.
+
+The two corrected sentences hold up against the repository rather than merely reading better. The obsolete
+path is present twice in `DESIGN.md` in exactly the five commits through `v0.1.0` and zero times at the last
+two commits, surviving at `HEAD` only as quoted text in one tracked audit file — which is what §1 now says,
+erring if anything toward overstating the exposure. The Gitleaks bullet no longer carries a count that goes
+stale on the next commit, and the re-run covers all seven.
+
+The security substance was re-derived, not re-read. Seven commits and the 44-file materialized public tree
+are Gitleaks-clean with no suppression file anywhere; a credential-shape grep across every commit matches
+only prose describing the patterns; RFC1918 literals are absent from all seven commits; and the check that
+actually decides it — 25 real private strings from `.env` and the live snapshot searched against both the
+whole public corpus and the full patch history — matched exactly four times, all on the generic words
+`Router`, `Switch`, `Server`, and `Ruckus`. The token, the URL, and the host matched nothing. Dependencies
+audit clean against an explicit 505-line frozen export, licensing compatible, both action pins re-resolved
+byte-for-byte against the live GitHub API and both still current, zizmor clean at its strictest persona on
+two versions including one online run, and both matrix legs green at 39 passed with the 3.12 leg executed
+inside an isolated clone. The approval gate holds absolutely: one private Gitea remote, three refs, no
+GitHub repository under any plausible owner, zero global search hits against a search sanity-checked to be
+working, PyPI unclaimed, nothing pushed anywhere.
+
+What holds this at CONDITIONAL is one clause, and it is deliberately narrow. The prior pass's condition 2
+had two halves; the stale-count half is fixed and the `pip-audit -r` half is not. `docs/PUBLICATION.md:73`
+still records a command that, run exactly as written, audits the ambient environment instead of the locked
+set — a step that cannot fail. The fact it asserts is true; this session verified it with the correct form.
+But this milestone's deliverable is a _correct publication procedure_ whose only enforcement is an operator
+following the document, which makes an unfalsifiable step in the evidence list a defect in the deliverable
+itself, not a nit about the deliverable's prose. It is one clause.
+
+The one optional item worth doing soon is **N1**: the new link check asks whether a target exists on the
+runner's disk rather than whether it exists in the published tree, so a link to a gitignored or absolute
+local path passes locally and 404s for every public reader — the exact defect class the script was written
+to prevent. No such link exists today; all seven current targets were independently confirmed tracked. It is
+about a one-line change, and the moment to make it is before someone adds a link to `snapshot/`.
+
+Conditions on close:
+
+1. Record the explicit `pip-audit --strict -r <frozen export>` form in `docs/PUBLICATION.md`'s evidence list,
+   discharging the outstanding half of the previous audit's condition 2 (**F2**, **E3**).
+
+Recommended, not blocking: change `_broken_local_links` to test membership in the tracked set rather than
+filesystem existence (**N1**); add `scripts` to `mypy`'s `files` (**N2**); bound the gate script's non-Git
+and missing-`DESIGN.md` failures (**N3**, **N6**); state in §1 that `.planning/` publishes in full (**F1**,
+**OP1**); assert rather than print the post-push ref comparison (**F4**); and fill the `<repository-url>`
+placeholder and `git clone` line once the real URL exists (**F3**, **C1**).
+
+Per instruction, this audit did not edit `ROADMAP.md` or `STATE.md`, created no remote, repository, or other
+resource, pushed nothing, and rewrote no history. All mutation testing was confined to a throwaway clone in
+a scratch directory. It wrote `.planning/TRACEABILITY.md` and this section only, and committed nothing.

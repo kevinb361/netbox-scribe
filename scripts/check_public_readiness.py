@@ -63,8 +63,15 @@ def _broken_local_links(tracked: set[str]) -> list[str]:
                 continue
             path_part = target.split("#", 1)[0]
             candidate = (document.parent / path_part).resolve()
-            if not candidate.exists():
-                findings.append(f"broken local link in {relative}: {target}")
+            try:
+                published_path = candidate.relative_to(ROOT).as_posix().rstrip("/")
+            except ValueError:
+                published_path = ""
+            is_tracked = published_path in tracked or any(
+                path.startswith(f"{published_path}/") for path in tracked
+            )
+            if not candidate.exists() or not published_path or not is_tracked:
+                findings.append(f"broken or untracked local link in {relative}: {target}")
     return findings
 
 
