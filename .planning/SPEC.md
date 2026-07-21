@@ -45,3 +45,21 @@ The system SHALL retrieve every page of device records from the read-only NetBox
 - GIVEN NetBox returns a cross-origin or repeated pagination URL
 - WHEN the client follows pagination
 - THEN retrieval stops with a safe response error before credentials leave the configured origin or a loop continues
+
+### REQ: deterministic-canonical-device-yaml
+
+The system SHALL export normalized NetBox device records as canonical YAML with an explicit schema version.
+
+#### Scenario: unchanged-inventory
+
+- GIVEN two exports receive semantically identical device records
+- WHEN `nbscribe export` writes each snapshot
+- THEN both output files are byte-identical
+- AND devices, references, tags, and mapping keys have stable ordering
+
+#### Scenario: canonical-core-fields
+
+- GIVEN a NetBox device contains core identity, placement, platform, address, and tag data
+- WHEN the device is normalized
+- THEN supported core fields are represented consistently in YAML
+- AND unconfigured custom fields are not copied implicitly

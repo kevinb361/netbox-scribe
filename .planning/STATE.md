@@ -3,9 +3,9 @@ saga_state_version: 1.0
 milestone: v0.1
 milestone_name: First Useful Snapshot
 status: active
-stopped_at: REQ-002 proven; REQ-003 is next.
-last_updated: "2026-07-21T16:20:00Z"
-last_activity: 2026-07-21 — implemented and verified safe paginated NetBox device retrieval.
+stopped_at: REQ-003 proven; REQ-004 is next.
+last_updated: "2026-07-21T19:45:00Z"
+last_activity: 2026-07-21 — resolved the REQ-003 escalation and verified deterministic canonical YAML export.
 ---
 
 # NetBox Scribe — State
@@ -14,14 +14,15 @@ last_activity: 2026-07-21 — implemented and verified safe paginated NetBox dev
 
 Phase/Milestone: v0.1 First Useful Snapshot
 Status: active
-Last activity: 2026-07-21 — REQ-002 proved paginated retrieval and credential-safe failure handling against synthetic HTTP fixtures.
+Last activity: 2026-07-21 — REQ-003 proved normalized, schema-versioned, byte-identical device YAML through the CLI.
 
-The next bounded slice is REQ-003: normalize device records into deterministic, schema-versioned YAML through `nbscribe export`.
+The next bounded slice is REQ-004: publish an export atomically without replacing the last valid snapshot on failure.
 
 ## Active Work
 
-- REQ-002 complete — `make ci` passed with 13 tests; synthetic token-leak and pagination safety checks passed.
-- Next: plan REQ-003 before implementation.
+- REQ-003 complete — `make ci` passed with 15 tests; focused two-run determinism and output-leak checks passed.
+- Escalation resolved by removing the redundant PyYAML return cast identified by MyPy.
+- Next: plan REQ-004 before implementation.
 
 ## Deferred
 
