@@ -1,26 +1,32 @@
 ---
 saga_state_version: 1.0
-milestone: v0.2
-milestone_name: Network Relationships
-status: idle
-stopped_at: v0.1.0 verified PASS; release commit/tag/push is the final mechanical action.
-last_updated: "2026-07-21T23:00:00Z"
-last_activity: 2026-07-21 — independent re-audit passed with all 9 requirements PROVEN and no critical findings.
+milestone: v0.1.1
+milestone_name: Public GitHub Readiness
+status: active
+stopped_at: public-readiness audit CONDITIONAL; commit prepared tree privately, then re-audit.
+last_updated: "2026-07-21T23:45:00Z"
+last_activity: 2026-07-21 — frontier audit confirmed security/privacy readiness and identified three publication-mechanics blockers.
 ---
 
 # NetBox Scribe — State
 
 ## Current Position
 
-Phase/Milestone: v0.2 Network Relationships
-Status: idle
-Last activity: 2026-07-21 — independent frontier re-audit confirmed protocol-relative and scheme-downgrade pagination cannot receive credentials; v0.1.0 passed with 9 PROVEN / 0 ASSERTED / 0 OPEN.
+Phase/Milestone: v0.1.1 Public GitHub Readiness
+Status: active
+Last activity: 2026-07-21 — independent audit re-proved clean secrets/privacy/dependencies/CI and accepted public Gmail metadata, but returned CONDITIONAL because the prepared deliverable was uncommitted and two publication-doc claims needed correction.
 
-v0.1.0 is release-ready. v0.2 remains unscoped until after the release commit, tag, and push.
+Documentation blockers are fixed locally. Commit the prepared tree privately, then rerun the frontier audit. No GitHub remote, repository, or public ref has been created.
 
 ## Active Work
 
-None. Release commit/tag/push is mechanical; v0.2 requires scoping before implementation.
+- REQ-010 locally complete — Gitleaks full-history scan, regex review, `pip-audit --strict`, dependency license review, and ignored-file checks are clean; intentional author email/local-path history is disclosed for operator acceptance.
+- REQ-011 locally complete — least-privilege, immutable-SHA-pinned CI passes zizmor/YAML lint and local Python 3.12 reproduction.
+- REQ-012 locally complete — `SECURITY.md`, `CONTRIBUTING.md`, and README entry points are public-safe.
+- REQ-013 locally complete — `docs/PUBLICATION.md` provides settings and commands while preserving explicit approval.
+- Frontier audit CONDITIONAL: D1 path-history wording fixed; D2 dead Saga link removed; D3 requires the prepared files to exist in a commit before any mirror.
+- Next: verify and commit privately, then re-audit from committed state.
+- Outward publication remains unauthorized.
 
 ## Deferred
 

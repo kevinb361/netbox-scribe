@@ -135,6 +135,49 @@ The system SHALL require explicit inclusion for custom fields and support option
 - WHEN none are explicitly included
 - THEN no custom field value appears in YAML, Markdown, stdout, or stderr
 
+### REQ: public-history-safety
+
+The project SHALL be publishable without credentials, private infrastructure, or unreviewed legal ambiguity in its tracked tree or reachable Git history.
+
+#### Scenario: public-readiness-scan
+
+- GIVEN every commit and tracked artifact
+- WHEN automated secret, private-network, dependency, license, and public-path checks run
+- THEN no credential or private infrastructure disclosure remains
+- AND intentional maintainer identity/history disclosures are surfaced for operator approval
+
+### REQ: least-privilege-github-ci
+
+The project SHALL run its existing deterministic gate on supported Python versions in GitHub Actions with minimum token permissions.
+
+#### Scenario: pull-request-ci
+
+- GIVEN a push or pull request
+- WHEN GitHub Actions executes CI
+- THEN Python 3.11 and 3.12 each run the locked `make ci` gate
+- AND workflow actions are immutable-SHA pinned with repository contents read-only
+
+### REQ: public-contributor-security-policy
+
+The project SHALL document contribution checks, compatibility expectations, sensitive-data boundaries, and private vulnerability reporting.
+
+#### Scenario: fresh-contributor
+
+- GIVEN a contributor or security reporter arrives without session context
+- WHEN they read project entry-point documentation
+- THEN they can run the required gate and report changes or vulnerabilities without publishing secrets or real inventory
+
+### REQ: operator-gated-github-publication
+
+The project SHALL provide a reproducible publication handoff while retaining explicit approval for repository creation and public pushes.
+
+#### Scenario: prepared-not-published
+
+- GIVEN public-readiness checks pass
+- WHEN preparation completes
+- THEN repository settings, security controls, branch protection, and mirror commands are documented
+- AND no GitHub resource or public ref is created until the operator approves it
+
 ### REQ: public-safe-operator-guidance
 
 The system SHALL provide public-safe guidance and synthetic fixtures for the complete snapshot workflow.

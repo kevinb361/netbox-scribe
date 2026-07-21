@@ -175,7 +175,11 @@ Not currently in scope:
 - a web UI; or
 - an embedded LLM dependency.
 
-Roadmap and evidence are tracked with [Saga](https://github.com/earendil-works/saga) in [`.planning/`](.planning/).
+Roadmap, requirements, and verification evidence are tracked in [`.planning/`](.planning/).
+
+## Contributing and security
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the development workflow and pull-request expectations. Report suspected vulnerabilities privately according to [`SECURITY.md`](SECURITY.md); do not include live tokens or inventory in public reports.
 
 ## License
 

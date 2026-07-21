@@ -565,3 +565,283 @@ more common than the attack it sits next to, and it pairs naturally with S4's mi
 **Release-readiness note, not a finding:** the entire milestone is still uncommitted working tree. The code
 passes; there is simply nothing yet for a `v0.1.0` tag to point at. Commit the milestone first, then tag.
 Per instruction, this audit did not edit `ROADMAP.md` or `STATE.md` and created no Git tag.
+
+---
+
+## Audit: v0.1.1 Public GitHub Readiness — 2026-07-21 (independent public-readiness audit)
+
+Auditor: Claude Opus 4.8 (`claude-opus-4-8`, 1M context) via Claude Code — independent frontier audit,
+invoked directly by the operator rather than through `saga-loop`. `.planning/config.json` carries a
+populated `close_out_auditor`, so no configuration warning applies.
+
+Scope: v0.1.1 Public GitHub Readiness — public-safety audit of the complete reachable history and public
+tree, least-privilege GitHub CI, public security/contribution policy, and an operator-gated publication
+handoff. Four requirements: REQ-010..REQ-013.
+
+Files reviewed: 7 tracked files changed, 76 insertions(+), 17 deletions(-) (`git diff HEAD --shortstat`),
+plus 4 new untracked files totalling 196 lines (`.github/workflows/ci.yml` 46, `CONTRIBUTING.md` 48,
+`SECURITY.md` 27, `docs/PUBLICATION.md` 75). Whole-repository scans additionally covered all 5 reachable
+commits and the 43-file materialized public tree.
+
+Method note: this audit did not read the milestone's claims and agree with them. Every scanner, pin, gate,
+and reachability assertion in `STATE.md` and `docs/PUBLICATION.md` was re-executed. Two of the re-runs were
+deliberately constructed differently from the originals — see **M1** and **M2** — because the original
+invocations could have produced a clean result without examining this project at all.
+
+### Correctness
+
+- [critical] **D3 — the entire v0.1.1 deliverable is uncommitted, and the handoff does not say so.**
+  `git ls-files --others --exclude-standard` returns `.github/workflows/ci.yml`, `CONTRIBUTING.md`,
+  `SECURITY.md`, and `docs/PUBLICATION.md`; the `DESIGN.md` remediation is an unstaged working-tree change.
+  `docs/PUBLICATION.md:56-60` instructs the operator to `git remote add github …` then `git push github
+main` with no intervening commit step. Executed literally today, that publishes `a71831f` — a repository
+  with **no CI workflow, no `SECURITY.md`, no `CONTRIBUTING.md`, no publication doc, and the old
+  `DESIGN.md`** — and then `docs/PUBLICATION.md:63-67`'s `git rev-parse main github/main` check would
+  _pass_, because both sides would agree on the wrong commit. The verification step cannot catch this class
+  of error. Fix: commit the milestone first, and add an explicit "working tree is clean and every v0.1.1
+  artifact is tracked" precondition above the command block — `git status --porcelain` returning empty is
+  the check that actually discriminates. This is the same failure mode the v0.1.0 audit flagged in its
+  closing note; it has now recurred, which argues for making it a standing line item in the handoff rather
+  than a per-audit observation.
+
+- [critical] **D1 — `docs/PUBLICATION.md` §1 materially understates the obsolete-path exposure.** The text
+  reads "The initial commit also contains an obsolete local profile path in `DESIGN.md`." In fact
+  `/home/kevin/.agent-profile/DESIGN.md` appears in **all five commits, including `HEAD`** — at
+  `DESIGN.md:6` (`source:` frontmatter) and `DESIGN.md:64` (prose) of `a71831f`, verified by `git grep`
+  across `git rev-list --all`. The distinction is not pedantic: "in the initial commit" implies a
+  history-only residue that a squash or a shallow import would drop, whereas the truth is that it is in the
+  currently committed tree and, absent D3's fix, would publish as _live content_ rather than as history.
+  Fix: correct the sentence to "all five commits including `HEAD`" and state that the working-tree
+  remediation must be committed before mirroring.
+
+- [warning] **D2 — `README.md`'s Saga link is dead.** `README.md:158` links
+  `https://github.com/earendil-works/saga`, which returns **HTTP 404**. The `earendil-works` org exists and
+  has 12 public repositories, none named `saga`; a GitHub-wide search for that repository name returns 0
+  results, and Saga's only reachable origin on this machine is `gitea:kevin/saga.git` (private). A public
+  README's first outbound link 404-ing is exactly the kind of defect a cold reader hits in the first minute.
+  Fix: point at Saga's real public home if one exists, or describe it without a hyperlink
+  ("tracked with Saga in `.planning/`"). This sits inside REQ-012's named evidence ("README entry-point
+  links"), which is why it is recorded here rather than left as a nit.
+
+- [info] **C1 — README's install path assumes a clone that it never instructs.** `README.md:31-34` opens with
+  `uv tool install .` — a local-path install — but nothing above it tells a reader arriving from the GitHub
+  landing page to clone first. `CONTRIBUTING.md:11` has `git clone <repository-url>` with the placeholder
+  still unresolved. Cheap fix once the real URL exists: a `git clone` line above the install block and the
+  concrete URL substituted into `CONTRIBUTING.md`.
+
+### Safety
+
+- [info] **S1 — no secret, credential, or private-infrastructure disclosure in history or the public tree.**
+  This is the headline REQ-010 claim and it holds under independent re-derivation. Gitleaks 8.30.1 over
+  `--all --full-history` (5 commits, 315.84 KB) and over the materialized public tree (43 files,
+  309.22 KB): no leaks in either. An independent `git grep` across all five commits for credential shapes
+  (`Bearer …`, `Token <hex40>`, `AKIA…`, `ghp_`/`gho_`/`github_pat_`, PEM headers, `password=`/`secret=`/
+  `api_key=`) surfaced only four synthetic fixture strings in `tests/test_client.py` — `"auth-failure-
+secret"` and siblings, which exist precisely to be asserted _absent_ from error output. The decisive
+  evidence is not the scanners, though: the 11 real device names, both real IP literals, the `NETBOX_URL`
+  host, and the 40-character `NETBOX_TOKEN` from `.env` were each searched directly against the full public
+  corpus and against `git log --all -p`. **Zero matches.** Of 85 distinct tokens lifted from the live
+  dogfood snapshot, the only overlaps were generic schema vocabulary (`status`, `manufacturer`) and vendor
+  or role words (`Router`, `Switch`, `Ruckus`) that appear in synthetic fixtures. Scanners find secret
+  _shapes_; this finds the specific private strings this repository has actually handled, which is the
+  stronger test.
+
+- [info] **S2 — the ignored-file assumptions are demonstrated, not assumed.** `git ls-files -i -c
+--exclude-standard` is empty, so nothing ignored is simultaneously tracked. `git check-ignore -v`
+  attributes each sensitive path to a specific rule: `.env`→`.gitignore:15`, `.env.local`→`:16`,
+  `snapshot/…`→`:19`, `dist/…`→`:11`, `build/…`→`:12`, `config.yaml`→`:18`,
+  `.planning/.close-out-auditor.log`→`:20`. The `.env.*` / `!.env.example` negation is ordered correctly and
+  `.env.example` resolves as not-ignored, which matters because it is a tracked file that a naive rule
+  ordering would silently drop. The live `snapshot/` artifacts are mode `0600` and untracked.
+
+- [info] **S3 — `--allow-insecure-http` is documented honestly in the public-facing surface.**
+  `SECURITY.md:24` states plainly that the override "sends the token in plaintext"; `README.md:64` repeats
+  the warning. The dogfood environment does use plaintext HTTP against an RFC1918 address, which is exactly
+  the trusted-network case the flag exists for — worth noting only because it means the override is a lived
+  path rather than a theoretical one, so its documentation carries real weight.
+
+- [info] **S4 — the redirect follow-up carried on `STATE.md` is hardening, not an open credential leak.**
+  `client.py:57-62` constructs `httpx.Client(...)` without `follow_redirects`. Verified empirically against
+  the pinned httpx 0.28.1: the default is `False`, so a `3xx` is never followed and the token is never
+  re-sent to a redirect target. A redirect instead falls through `response.is_error` (false for 3xx) into
+  `_parse_page`, producing `NetBox returned a malformed response` — which is the misleading-diagnostic
+  defect already recorded as v0.1.0 finding OP4. The deferred item is worth doing for explicitness and
+  message quality; it is not a live security gap, and publishing it in a public `AUDIT.md` discloses no
+  exploitable path.
+
+- [info] **S5 — the approval gate is procedural, not technical.** The local `gh` CLI is authenticated as
+  `kevinb361` with `repo` and `workflow` scopes. Any agent or script with shell access in this environment
+  could create the public repository and push without further credentials. Nothing is wrong with the repo
+  here — but "no GitHub resource exists" is a fact about restraint, not about an enforced control. Worth
+  the operator knowing when deciding how much of this workflow to hand to automation.
+
+- [info] **S6 — a private mirror already holds the full history.** `origin` is
+  `gitea:kevin/netbox-scribe.git` (self-hosted Gitea over SSH, port 2222), and `refs/remotes/origin/main`
+  is at `a71831f` — the same commit as local `main`. Not a GitHub resource and not a REQ-013 violation. It
+  matters for one reason: if the operator ever elects to rewrite history to scrub the author email or the
+  `/home/kevin` path, the Gitea copy and the annotated `v0.1.0` tag must be handled in the same operation,
+  or the rewrite will be silently incomplete.
+
+### Test Coverage
+
+- [info] **TC1 — both CI matrix legs were reproduced locally, and the 3.12 leg was run against the public
+  tree.** 3.11.14 (project venv): `make ci` → black clean 15 files, ruff clean, mypy clean 15 source files,
+  `pytest -n auto` **39 passed**. 3.12.3: executed inside the materialized public-tree copy with
+  `UV_FROZEN=1` and an isolated `UV_PROJECT_ENVIRONMENT` → identical results, **39 passed**. The second run
+  is the more informative one: it proves the published tree is self-sufficient — it syncs from the frozen
+  lock, type-checks, and passes every test with `.env`, `snapshot/`, `dist/`, and all caches absent. A
+  hidden dependency on an ignored file would have failed there and nowhere else.
+
+- [info] **TC2 — the public-safety property has a test behind it, not just a scan.**
+  `tests/test_examples.py::test_public_docs_and_examples_contain_no_private_networks_or_credentials` runs in
+  the standard gate, so the docs/examples safety invariant regresses loudly rather than depending on
+  someone remembering to re-run Gitleaks. That is the right shape for this class of check.
+
+- [warning] **TC3 — nothing in the gate would catch D2 or D3.** There is no link check over `README.md` and
+  no assertion that the publication-critical files are tracked. Both defects found in this audit are
+  precisely the kind the suite is blind to. A dozen-line test that walks `README.md`'s relative links and a
+  `git status --porcelain`-empty precondition in the handoff would close both cheaply. Not blocking — but
+  D2 and D3 are the evidence that the gap is real rather than hypothetical.
+
+### Architecture Fit
+
+- [info] **AR1 — the CI workflow is genuinely least-privilege and correctly supply-chain-pinned.**
+  Top-level `permissions: contents: read` with no job-level widening; no `pull_request_target`; no `secrets`
+  reference anywhere in the file; `persist-credentials: false` on checkout, so no `GITHUB_TOKEN` remains in
+  `.git/config` for `make ci` to reach — which is the control that actually matters given that `make ci`
+  executes repository-supplied code on fork pull requests. `concurrency` with `cancel-in-progress` and
+  `timeout-minutes: 10` bound cost. **Both SHAs were verified against the live GitHub API rather than
+  eyeballed:** `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` is exactly `refs/tags/v7.0.1`
+  and `astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9` is exactly `refs/tags/v9.0.0`; both are
+  the current latest release of their project (published 2026-07-20 and 2026-07-21). `zizmor` 1.27.0 at
+  `--persona=auditor`, its strictest setting, reports no findings. `yamllint -d relaxed` flags one 82-char
+  line and nothing else. Note that REQ-011's own wording says "pinned major action versions" while the
+  workflow does the strictly stronger thing and pins immutable full SHAs — the requirement understates its
+  own implementation.
+
+- [info] **AR2 — the job name and the branch-protection plan agree.** `name: Python ${{
+matrix.python-version }}` renders as `Python 3.11` and `Python 3.12`, which are verbatim the required
+  checks named in `docs/PUBLICATION.md:47`. This is a small thing that is wrong surprisingly often, and
+  getting it wrong means branch protection silently guards nothing.
+
+- [info] **AR3 — dependency licensing is clean for MIT redistribution.** Runtime tree: httpx BSD-3-Clause,
+  jsonschema MIT, PyYAML MIT, httpcore BSD-3-Clause, idna BSD-3-Clause, h11/anyio/attrs/referencing/
+  rpds-py/jsonschema-specifications MIT, typing-extensions PSF-2.0. See **I2** for the one non-MIT-family
+  entry.
+
+- [info] **I2 — `certifi` is MPL-2.0, and that is fine here.** MPL-2.0 is file-level weak copyleft: its
+  obligations attach to modifications of certifi's own files. This project neither vendors nor modifies it;
+  it is a transitive dependency of httpx resolved at install time. No source-disclosure obligation is
+  triggered on this MIT codebase. Recorded because "one MPL dep in the tree" is the sort of thing that
+  looks alarming later if nobody wrote down why it was cleared.
+
+### Operability
+
+- [info] **OP1 — `.planning/AUDIT.md` is tracked and will publish 567+ lines of self-critique.** Including
+  this section. It names deferred, currently-unfixed items — redirect diagnostics, output/index path
+  collisions, extreme YAML nesting, malformed-endpoint diagnostics. None is exploitable (see **S4** for the
+  redirect case), the only infrastructure fact disclosed is the _count_ "11 real homelab hostnames" with no
+  hostname, and for a pre-alpha tool this transparency is arguably an asset. But it is a deliberate choice
+  and it is not currently written down as one. Recommend a single line in `docs/PUBLICATION.md`
+  acknowledging that `.planning/` publishes in full, so the decision is made rather than inherited.
+
+- [info] **OP2 — the handoff's own evidence list is accurate apart from D1.** Each of the six bullets under
+  "Verified preparation evidence" was re-checked this pass: Gitleaks across five commits (confirmed),
+  full-history regex scan (confirmed), `pip-audit --strict` (confirmed, though see **M1** for how it was
+  re-run), ignored/untracked sensitive files (confirmed mechanically), workflow syntax and permissions
+  (confirmed), action versions checked against current signed releases before pinning (confirmed exactly).
+  The list is unusually honest for this kind of document.
+
+- [info] **OP3 — PyPI `netbox-scribe` returns HTTP 404.** Unclaimed, and `docs/PUBLICATION.md:14` correctly
+  states that availability is not reservation. No action before publication.
+
+- [info] **M1 — methodological correction: bare `pip-audit --strict` does not necessarily audit this
+  project.** With no `-r`/`-e` argument it audits the ambient environment, which under an ephemeral runner
+  can contain none of this project's dependencies and report clean regardless. Re-run against
+  `uv export --frozen --all-groups` (505 hash-pinned lines, runtime + dev): **no known vulnerabilities**.
+  Same verdict, but now the verdict is about this project. Worth pinning the explicit form into any future
+  dependency-audit step so the check cannot silently degrade to a no-op.
+
+- [info] **M2 — methodological correction: "scanned the tree" ≠ "scanned the tree that ships".** This pass
+  materialized `git ls-files ∪ git ls-files --others --exclude-standard` (43 files) into a scratch
+  directory and scanned _that_, so the exclusion of `.env`, `snapshot/`, `dist/`, and caches is demonstrated
+  by construction rather than trusted from `.gitignore`. It is also the artifact the 3.12 CI reproduction
+  ran against (**TC1**), which is why that run doubles as a self-sufficiency proof.
+
+### ASSERTED Items from TRACEABILITY.md
+
+- None. This session's `/saga-verify` pass classifies all 13 requirements **PROVEN**, with v0.1.1's four at
+  **PROVEN 4 · ASSERTED 0 · OPEN 0 · WAIVED 0**. Every v0.1.1 evidence artifact was re-executed rather than
+  read, so no classification rests on a claim inherited from a prior pass. REQ-013 is marked PROVEN with an
+  explicit defect annotation pointing at D1 and D3 — mechanically its named artifact exists and the
+  approval gate demonstrably holds, but the artifact contains an error that this audit, not the traceability
+  table, is the right place to gate on.
+
+### Explicit judgment: disclosed Gmail metadata and the obsolete `/home/kevin` path
+
+The operator asked for a ruling on each. They are not the same call.
+
+**Gmail commit metadata — PASS.** All five commits and the annotated `v0.1.0` tag carry
+`Kevin Blalock <kevin.blalock@gmail.com>` as author, committer, and tagger. This is the maintainer's own
+chosen public identity, it already agrees with `LICENSE:3` ("Copyright (c) 2026 Kevin Blalock") and
+`pyproject.toml:12`, and attributed authorship in commit metadata is the norm for open-source publication
+rather than an exception to it. It is not a credential, not infrastructure, and not third-party personal
+data. `docs/PUBLICATION.md` §1 already surfaces it for acknowledgement, which is the correct handling. No
+remediation is warranted. If the operator nonetheless prefers not to publish the address, the only complete
+options are a full history rewrite — which invalidates the annotated `v0.1.0` tag, must be replayed onto the
+Gitea mirror (**S6**), and buys nothing security-wise — or switching to a GitHub `noreply` address for
+future commits while accepting the existing five. That is a preference decision, not a finding.
+
+**Obsolete `/home/kevin/.agent-profile/DESIGN.md` path — CONDITIONAL ACCEPTANCE GATE.** On its merits the
+string is harmless: a local username and a dotfile path, no hostname, no address, no credential, nothing an
+attacker gains from. Published as history alone it would be a clean pass. It is conditional for two reasons
+that are about accuracy and sequencing rather than sensitivity. First, D1 — the handoff describes it as
+confined to the initial commit when it is in every commit including `HEAD`, so the operator would be
+accepting a smaller exposure than the real one. Second, D3 — because the remediation is uncommitted, a push
+today republishes the path as _current content_, not as history. Both conditions are cheap and mechanical:
+commit the corrected `DESIGN.md`, and fix one sentence in `docs/PUBLICATION.md`. Once done, the residue is
+history-only and the gate clears to PASS.
+
+### Verdict
+
+**PASS-CONDITIONAL**
+
+- Critical findings: **2** (D3, D1) — must fix before milestone close
+- Warnings: **2** (D2, TC3) — fix before shipping
+- Info: **16** (C1, S1, S2, S3, S4, S5, S6, TC1, TC2, AR1, AR2, AR3, I2, OP1, OP2, OP3 — plus methodology
+  notes M1, M2)
+
+Rationale: the substance of this milestone is sound and it survived being re-derived rather than re-read.
+There are no secrets and no private infrastructure anywhere in the five reachable commits or in the tree
+that would publish — and I am confident in that not because two Gitleaks runs came back clean, but because
+the 11 real device names and 2 real IP literals this project has actually touched were searched directly
+against the whole public corpus and the full patch history and matched nothing. The CI workflow is the best
+part of the milestone: least-privilege by construction, both action pins verified byte-for-byte against the
+live GitHub API and both at current latest, zizmor clean at its strictest persona, and both matrix legs
+reproduced locally — with the 3.12 leg deliberately run inside the materialized public tree, which
+simultaneously proves the published artifact is self-sufficient. Dependencies audit clean against an
+explicit frozen export, licensing is compatible, and the approval gate holds: no GitHub remote, no
+repository (404), zero global search hits, nothing pushed.
+
+What holds it back is not security, it is publication mechanics. Every artifact this milestone produced is
+still untracked, and the handoff's command block does not tell the operator to commit before pushing — so
+the documented procedure, followed exactly, publishes a repository missing its CI, its security policy, and
+its contributing guide, and the handoff's own `git rev-parse` verification would pass while it happened,
+because both sides would agree on the same wrong commit. Alongside it, the one sentence in that handoff
+describing the `/home/kevin` residue is wrong in the direction that understates the exposure. Neither is
+hard to fix. Both must be fixed before this milestone closes, because the deliverable of v0.1.1 is a
+_correct publication procedure_, and a procedure that publishes the wrong tree has not met that bar.
+
+The v0.1.0 audit closed with the identical observation — "the entire milestone is still uncommitted" — and
+it has now recurred at v0.1.1. That is a process signal, not a coincidence: the commit step deserves to be
+an explicit precondition in the handoff rather than something each audit rediscovers.
+
+Conditions on close:
+
+1. Commit the v0.1.1 working tree — the four untracked files and the `DESIGN.md` fix — before any mirror.
+2. Correct `docs/PUBLICATION.md` §1 to say all five commits including `HEAD`, and add a
+   `git status --porcelain`-empty precondition above the publication command block.
+3. Fix or remove the 404 `README.md` Saga link (D2).
+
+Per instruction, this audit did not edit `ROADMAP.md` or `STATE.md`, created no GitHub resource, added no
+remote, pushed nothing, and rewrote no history.

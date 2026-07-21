@@ -1,9 +1,8 @@
 ---
 version: alpha
 name: netbox-scribe Interface
-description: Project-local visual baseline. Extends Kevin Default Interface and adapts it to this project's UI surface.
-extends: Kevin Default Interface
-source: /home/kevin/.agent-profile/DESIGN.md
+description: Project-local visual baseline for any future UI surface.
+extends: project-local operational interface baseline
 colors:
   background: "#0A0D0B"
   background-elevated: "#0D1117"
@@ -61,7 +60,7 @@ components:
 
 ## Overview
 
-This project inherits Kevin Default Interface from `/home/kevin/.agent-profile/DESIGN.md`: low-light graphite surfaces, moss primary actions, amber warnings, muted red danger states, readable typography, and operational density.
+This project uses a low-light operational baseline: graphite surfaces, moss primary actions, amber warnings, muted red danger states, readable typography, and operational density.
 
 Use this file for project-specific deviations only. Keep the common path obvious and dangerous controls explicit.
 
