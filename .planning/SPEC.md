@@ -196,7 +196,7 @@ The system SHALL preserve the default device-only export while allowing an opera
 #### Scenario: relationship-export-request
 
 - GIVEN NetBox returns paginated device, device-interface, and IP-address records
-- WHEN an operator explicitly requests relationship export
+- WHEN an operator runs `nbscribe export --view network`
 - THEN every permitted page needed for the device → interface → assigned-IP slice is retrieved
 - AND the existing same-origin, loop, HTTPS, bounded-error, and token-redaction controls apply to every resource
 
@@ -207,27 +207,27 @@ The system SHALL preserve the default device-only export while allowing an opera
 - THEN its canonical device artifact and agent index retain the v0.1 behavior
 - AND no interface or IP-address request is issued
 
-### REQ: deterministic-canonical-relationship-artifacts
+### REQ: deterministic-canonical-network-document
 
-The system SHALL normalize device interfaces and their assigned IP addresses into deterministic, schema-versioned canonical artifacts.
+The system SHALL normalize devices, device interfaces, and their assigned IP addresses into one deterministic, schema-versioned canonical `network.yaml` document.
 
 #### Scenario: unchanged-relationships
 
 - GIVEN two relationship exports receive semantically identical records in different API orders
-- WHEN canonical artifacts are rendered
+- WHEN the canonical network document is rendered
 - THEN the output is byte-identical
-- AND records, references, and mapping keys use stable ordering and NetBox-backed identities
+- AND its separate device, interface, and IP-address collections use stable ordering, mapping keys, and NetBox-backed identities
 
 #### Scenario: relationship-scope
 
 - GIVEN NetBox contains unassigned addresses, addresses assigned to virtual-machine interfaces, prefixes, VLANs, cables, or virtual machines
 - WHEN the v0.2 relationship tracer is exported
-- THEN only device interfaces and IP addresses assigned to those interfaces enter the relationship artifacts
+- THEN only device interfaces and IP addresses assigned to those interfaces enter `network.yaml`
 - AND broader resource expansion remains outside this milestone
 
 ### REQ: validated-referential-integrity
 
-The system SHALL validate relationship schemas and typed references before publishing any artifact.
+The system SHALL validate the canonical network schema and typed references before publishing the network document or its derived index.
 
 #### Scenario: complete-reference-chain
 
@@ -243,26 +243,26 @@ The system SHALL validate relationship schemas and typed references before publi
 - THEN export fails with a bounded operator-facing error before publication
 - AND the invalid source record is identified without exposing response content or credentials
 
-### REQ: atomic-relationship-snapshot-set
+### REQ: atomic-network-document-pair
 
-The system SHALL publish all requested canonical relationship artifacts and derived indexes as one recoverable snapshot set.
+The system SHALL publish canonical `network.yaml` and its derived relationship index as one recoverable atomic pair.
 
-#### Scenario: multi-artifact-publication-failure
+#### Scenario: network-pair-publication-failure
 
-- GIVEN a complete valid relationship snapshot set already exists
+- GIVEN a complete valid network document and relationship index already exist
 - WHEN any fetch, validation, write, sync, replacement, or rollback step fails
-- THEN readers observe either the complete prior set or the complete new set, never a mixed generation
+- THEN readers observe the complete prior pair rather than a mixed generation
 - AND temporary or newly-created partial artifacts are removed or restored deterministically
 
 ### REQ: bounded-relationship-agent-navigation
 
-The system SHALL derive concise agent navigation from canonical relationship artifacts rather than duplicating an unbounded API dump.
+The system SHALL derive concise agent navigation from canonical `network.yaml` rather than duplicating an unbounded API dump.
 
 #### Scenario: device-network-orientation
 
-- GIVEN a valid relationship snapshot set
-- WHEN the agent index is generated
-- THEN an agent can navigate from a device to its interfaces and assigned IP addresses using stable canonical links
+- GIVEN a valid canonical network document
+- WHEN the relationship index is generated
+- THEN an agent can navigate from a device to its interfaces and assigned IP addresses using a stable canonical `network.yaml` link
 - AND the index states source freshness, schema version, exporter version, resource counts, and provenance
 
 ### REQ: per-resource-relationship-redaction

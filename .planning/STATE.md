@@ -3,9 +3,9 @@ saga_state_version: 1.0
 milestone: v0.2
 milestone_name: Network Relationships
 status: active
-stopped_at: v0.2 relationship tracer scoped; operator-facing command and artifact-set interface design is next.
-last_updated: "2026-07-22T01:20:00Z"
-last_activity: 2026-07-21 — activated v0.2 with six requirements for the device → interface → assigned-IP tracer.
+stopped_at: unified network document selected and recorded; REQ-014 retrieval/CLI tracer is next.
+last_updated: "2026-07-22T01:35:00Z"
+last_activity: 2026-07-21 — selected Design A: opt-in network view publishes one canonical network document plus one derived index.
 ---
 
 # NetBox Scribe — State
@@ -13,18 +13,18 @@ last_activity: 2026-07-21 — activated v0.2 with six requirements for the devic
 ## Current Position
 
 Phase/Milestone: v0.2 Network Relationships
-Status: active — scoped, implementation not started
-Last activity: 2026-07-21 — narrowed v0.2 to an opt-in device → interface → assigned-IP tracer with six observable requirements.
+Status: active — interface selected, implementation not started
+Last activity: 2026-07-21 — chose one canonical `network.yaml` containing normalized device, interface, and assigned-IP collections, paired atomically with one derived relationship index.
 
-The default device-only export remains compatible. Prefixes, VLANs, cables, and virtual machines move to v0.2.x after the relationship model is proven.
+Plain `nbscribe export` remains compatible; `nbscribe export --view network` selects the new view. Partitioned manifests and immutable generation bundles were rejected for the tracer and are documented in decision 0003.
 
 ## Active Work
 
-- REQ-014..REQ-019 define the complete v0.2 tracer: safe opt-in retrieval, deterministic canonical artifacts, typed referential integrity, recoverable snapshot-set publication, bounded agent navigation, and per-resource redaction.
-- Compatibility boundary: plain `nbscribe export` remains device-only and issues no interface or IP-address requests.
-- Scope boundary: unassigned/VM-assigned addresses, prefixes, VLANs, cables, and VMs are excluded from v0.2.
-- Next slice: design at least three operator-facing command/artifact-set interfaces, choose one, then record any hard-to-reverse layout decision before implementation.
-- Risk: interface design is repo-only; no NetBox or GitHub mutation is required.
+- Decision 0003: `--view network` produces one canonical `network.yaml` with separate device, interface, and assigned-IP collections plus one derived relationship index.
+- Rationale: reuse the proven canonical-plus-derived atomic boundary and keep reader consistency implicit; accept larger files and less selective RAG ingestion until measured evidence justifies partitioning.
+- Compatibility: plain `nbscribe export` remains device-only and does not request relationship endpoints.
+- Next slice: implement the REQ-014 vertical tracer test-first — CLI opt-in plus safe generic paginated retrieval for interfaces and device-assigned IPs, without rendering/publishing the final network schema yet.
+- Risk: repo-only implementation; synthetic HTTP transports only, no live NetBox mutation.
 
 ## Deferred
 
