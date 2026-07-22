@@ -36,7 +36,7 @@ Security settings:
 - Enable private vulnerability reporting.
 - Enable dependency graph, Dependabot alerts, secret scanning, and push protection where available.
 - Set Actions workflow permissions to read-only by default.
-- Allow GitHub-owned actions and `astral-sh/setup-uv`; the workflow pins both actions to full commit SHAs.
+- Allow GitHub-owned actions, `astral-sh/setup-uv`, and `pypa/gh-action-pypi-publish`; workflows pin every action to a full commit SHA.
 
 Protect `main` after the first CI run:
 
@@ -70,6 +70,27 @@ After the first push:
 2. Create a GitHub release from the existing annotated `v0.1.0` tag; do not upload locally built artifacts unless a reproducible release workflow is added.
 3. Re-run GitHub secret scanning and inspect every public file while logged out.
 4. Add the final GitHub URL to package metadata and README badges in a later patch.
+
+## PyPI trusted publication
+
+Package publication uses `.github/workflows/publish.yml` and GitHub OIDC; no long-lived PyPI token is stored. The workflow builds from an existing release tag, verifies that the tag matches the package version, checks both distributions, and passes only the resulting artifacts to an isolated publish job.
+
+PyPI publisher identity:
+
+- PyPI project: `netbox-scribe`
+- GitHub owner: `kevinb361`
+- GitHub repository: `netbox-scribe`
+- Workflow: `publish.yml`
+- Environment: `pypi`
+
+For a new release:
+
+1. Require the normal CI checks to pass on the release commit.
+2. Create and push an annotated version tag whose value matches `pyproject.toml`.
+3. Publish the GitHub release. The release event starts the trusted-publishing workflow.
+4. Verify the workflow conclusion and the files and metadata shown on PyPI.
+
+`workflow_dispatch` exists only to publish an existing tag when recovering from a missed release event. Supply the exact tag; the workflow rejects a version mismatch. PyPI rejects an attempt to overwrite an existing distribution version.
 
 ## Verified preparation evidence
 
