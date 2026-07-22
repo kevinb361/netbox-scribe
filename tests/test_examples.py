@@ -8,8 +8,8 @@ from typing import Any, cast
 import httpx
 
 from netbox_scribe.client import NetBoxClient
-from netbox_scribe.exporter import export_devices
-from netbox_scribe.policy import ExportPolicy
+from netbox_scribe.exporter import export_devices, export_network
+from netbox_scribe.policy import ExportPolicy, NetworkExportPolicy, ResourcePolicy
 
 ROOT = Path(__file__).parent.parent
 EXAMPLES = ROOT / "examples"
@@ -37,6 +37,32 @@ def test_synthetic_example_outputs_match_production_export(tmp_path: Path) -> No
     expected_index = EXAMPLES / "output/agent/INDEX.md"
     assert generated_canonical.read_bytes() == expected_canonical.read_bytes()
     assert generated_index.read_bytes() == expected_index.read_bytes()
+
+
+def test_synthetic_network_outputs_match_production_export(tmp_path: Path) -> None:
+    fixtures = {
+        "/api/dcim/devices/": "netbox-devices-page.json",
+        "/api/dcim/interfaces/": "netbox-interfaces-page.json",
+        "/api/ipam/ip-addresses/": "netbox-ip-addresses-page.json",
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        fixture = json.loads((EXAMPLES / fixtures[request.url.path]).read_text())
+        return httpx.Response(200, json=fixture)
+
+    output = tmp_path / "inventory/network.yaml"
+    index = tmp_path / "agent/NETWORK.md"
+    policy = NetworkExportPolicy(
+        interfaces=ResourcePolicy(include_fields=frozenset({"description"})),
+        ip_addresses=ResourcePolicy(include_fields=frozenset({"dns_name"})),
+    )
+    with NetBoxClient(
+        "https://netbox.example", "synthetic-token", transport=httpx.MockTransport(handler)
+    ) as client:
+        export_network(client, output, agent_index=index, policy=policy)
+
+    assert output.read_bytes() == (EXAMPLES / "output/inventory/network.yaml").read_bytes()
+    assert index.read_bytes() == (EXAMPLES / "output/agent/NETWORK.md").read_bytes()
 
 
 def test_public_docs_and_examples_contain_no_private_networks_or_credentials() -> None:

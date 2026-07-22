@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, cast
 
 import httpx
 
 DeviceRecord = dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class NetworkRecords:
+    """Raw records needed for the device-interface-address relationship view."""
+
+    devices: list[DeviceRecord]
+    interfaces: list[DeviceRecord]
+    ip_addresses: list[DeviceRecord]
 
 
 class NetBoxClientError(RuntimeError):
@@ -63,8 +73,21 @@ class NetBoxClient:
 
     def list_devices(self) -> list[DeviceRecord]:
         """Return every device from the paginated NetBox device endpoint."""
-        devices: list[DeviceRecord] = []
-        next_url: str | None = "api/dcim/devices/"
+        return self._list_records("api/dcim/devices/")
+
+    def list_network_records(self) -> NetworkRecords:
+        """Return raw records for the device-interface-address relationship view."""
+        return NetworkRecords(
+            devices=self.list_devices(),
+            interfaces=self._list_records("api/dcim/interfaces/"),
+            ip_addresses=self._list_records(
+                "api/ipam/ip-addresses/?assigned_object_type=dcim.interface"
+            ),
+        )
+
+    def _list_records(self, initial_url: str) -> list[DeviceRecord]:
+        records: list[DeviceRecord] = []
+        next_url: str | None = initial_url
         seen_urls: set[httpx.URL] = set()
 
         while next_url is not None:
@@ -80,12 +103,12 @@ class NetBoxClient:
                 raise NetBoxAuthenticationError("NetBox authentication failed")
             if response.is_error:
                 raise NetBoxResponseError(f"NetBox returned HTTP {response.status_code}")
-            page_devices, next_url = _parse_page(response)
+            page_records, next_url = _parse_page(response)
             if next_url is not None:
                 self._ensure_safe_next_url(next_url)
-            devices.extend(page_devices)
+            records.extend(page_records)
 
-        return devices
+        return records
 
     def _ensure_safe_next_url(self, next_url: str) -> None:
         try:

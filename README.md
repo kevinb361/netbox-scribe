@@ -114,6 +114,29 @@ nbscribe export \
 
 Exclusion wins when a field appears in both lists. Unknown core field names fail before NetBox is contacted.
 
+## Export network relationships
+
+The opt-in network view exports devices, device interfaces, and IP addresses assigned to those interfaces as one validated canonical document plus a derived relationship index:
+
+```shell
+nbscribe export --view network \
+  --output snapshot/inventory/network.yaml \
+  --agent-index snapshot/agent/NETWORK.md
+```
+
+Plain `nbscribe export` remains device-only. The network view excludes unassigned and VM-assigned addresses; VLANs, prefixes, cables, and virtual machines are not yet included.
+
+Interface and IP-address optional fields are closed by default. Include only reviewed values with resource-specific flags:
+
+```shell
+nbscribe export --view network \
+  --include-interface-field description \
+  --include-interface-custom-field owner \
+  --include-ip-address-field dns_name
+```
+
+Corresponding `--exclude-interface-*` and `--exclude-ip-address-*` flags take precedence. Mandatory IDs, names, addresses, and typed relationship references cannot be excluded. See the synthetic network fixtures and generated outputs under [`examples/`](examples/).
+
 ## Validate
 
 Every export is checked against the packaged JSON Schema before publication. Existing files can be checked directly:

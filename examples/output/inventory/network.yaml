@@ -1,0 +1,69 @@
+schema_version: 1
+source: netbox
+devices:
+  - id: 1
+    name: router-01
+    display: Router 01
+    status:
+      value: active
+      label: Active
+    role:
+      id: 1
+      name: Router
+      slug: router
+    site:
+      id: 1
+      name: Example Lab
+      slug: example-lab
+    serial: SYNTHETIC-001
+    description: Synthetic edge router
+    tags:
+      - id: 1
+        name: Edge
+        slug: edge
+  - id: 2
+    name: switch-01
+    display: Switch 01
+    status:
+      value: active
+      label: Active
+    role:
+      id: 2
+      name: Access Switch
+      slug: access-switch
+    site:
+      id: 1
+      name: Example Lab
+      slug: example-lab
+    serial: SYNTHETIC-002
+    description: Synthetic access switch
+    tags:
+      - id: 2
+        name: Managed
+        slug: managed
+interfaces:
+  - id: 10
+    name: wan0
+    device:
+      type: dcim.device
+      id: 1
+    description: Synthetic WAN
+  - id: 20
+    name: ethernet1/1
+    device:
+      type: dcim.device
+      id: 2
+    description: Synthetic uplink
+ip_addresses:
+  - id: 100
+    address: 192.0.2.1/24
+    assigned_object:
+      type: dcim.interface
+      id: 10
+    dns_name: router-01.example.test
+  - id: 200
+    address: 192.0.2.20/24
+    assigned_object:
+      type: dcim.interface
+      id: 20
+    dns_name: switch-01.example.test

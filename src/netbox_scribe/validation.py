@@ -31,7 +31,12 @@ def validate_snapshot_text(content: str) -> dict[str, Any]:
             f"unsupported schema version {version}; expected {SCHEMA_VERSION}"
         )
 
-    schema_resource = files("netbox_scribe.schemas.v1").joinpath("devices.schema.json")
+    schema_name = (
+        "network.schema.json"
+        if "interfaces" in document or "ip_addresses" in document
+        else "devices.schema.json"
+    )
+    schema_resource = files("netbox_scribe.schemas.v1").joinpath(schema_name)
     schema = cast(dict[str, Any], json.loads(schema_resource.read_text(encoding="utf-8")))
     errors = sorted(
         Draft202012Validator(schema).iter_errors(document), key=lambda error: list(error.path)

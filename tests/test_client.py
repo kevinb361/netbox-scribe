@@ -51,6 +51,55 @@ def test_client_allows_explicit_insecure_http_override() -> None:
     assert requests[0].headers["Authorization"] == "Token explicit-http-secret"
 
 
+def test_list_network_records_retrieves_each_relationship_resource() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        records = {
+            "/api/dcim/devices/": [{"id": 1, "name": "router-01"}],
+            "/api/dcim/interfaces/": [{"id": 2, "name": "eth0", "device": {"id": 1}}],
+            "/api/ipam/ip-addresses/": [
+                {
+                    "id": 3,
+                    "address": "192.0.2.1/24",
+                    "assigned_object_type": "dcim.interface",
+                    "assigned_object_id": 2,
+                }
+            ],
+        }
+        return httpx.Response(
+            200,
+            json={
+                "count": len(records[request.url.path]),
+                "next": None,
+                "previous": None,
+                "results": records[request.url.path],
+            },
+        )
+
+    client = NetBoxClient(
+        "https://netbox.example",
+        "relationship-secret",
+        transport=httpx.MockTransport(handler),
+    )
+
+    network = client.list_network_records()
+
+    assert network.devices == [{"id": 1, "name": "router-01"}]
+    assert network.interfaces == [{"id": 2, "name": "eth0", "device": {"id": 1}}]
+    assert network.ip_addresses[0]["assigned_object_id"] == 2
+    assert [request.url.path for request in requests] == [
+        "/api/dcim/devices/",
+        "/api/dcim/interfaces/",
+        "/api/ipam/ip-addresses/",
+    ]
+    assert requests[-1].url.params["assigned_object_type"] == "dcim.interface"
+    assert all(
+        request.headers["Authorization"] == "Token relationship-secret" for request in requests
+    )
+
+
 def test_list_devices_retrieves_every_page() -> None:
     requests: list[httpx.Request] = []
 

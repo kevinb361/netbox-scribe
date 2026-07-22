@@ -1,0 +1,25 @@
+{
+  "count": 2,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 200,
+      "address": "192.0.2.20/24",
+      "assigned_object_type": "dcim.interface",
+      "assigned_object_id": 20,
+      "dns_name": "switch-01.example.test",
+      "description": "not exported",
+      "last_updated": "2026-07-21T19:15:00Z"
+    },
+    {
+      "id": 100,
+      "address": "192.0.2.1/24",
+      "assigned_object_type": "dcim.interface",
+      "assigned_object_id": 10,
+      "dns_name": "router-01.example.test",
+      "description": "not exported",
+      "last_updated": "2026-07-21T18:45:00Z"
+    }
+  ]
+}

@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:netbox-scribe:schema:network:v1",
+  "title": "NetBox Scribe Network Snapshot v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "source", "devices", "interfaces", "ip_addresses"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "source": {"const": "netbox"},
+    "devices": {"type": "array", "items": {"$ref": "#/$defs/device"}},
+    "interfaces": {"type": "array", "items": {"$ref": "#/$defs/interface"}},
+    "ip_addresses": {"type": "array", "items": {"$ref": "#/$defs/ip_address"}}
+  },
+  "$defs": {
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "integer", "minimum": 1},
+        "name": {"type": "string"},
+        "slug": {"type": "string"}
+      }
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {"value": {"type": "string"}, "label": {"type": "string"}}
+    },
+    "ip": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "integer"},
+        "address": {"type": "string"},
+        "dns_name": {"type": "string"},
+        "description": {"type": "string"}
+      }
+    },
+    "device_type": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "integer"},
+        "model": {"type": "string"},
+        "slug": {"type": "string"},
+        "manufacturer": {"$ref": "#/$defs/reference"}
+      }
+    },
+    "device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": {"type": "integer", "minimum": 1},
+        "name": {"type": "string", "minLength": 1},
+        "display": {"type": "string"},
+        "status": {"$ref": "#/$defs/status"},
+        "role": {"$ref": "#/$defs/reference"},
+        "device_type": {"$ref": "#/$defs/device_type"},
+        "site": {"$ref": "#/$defs/reference"},
+        "location": {"$ref": "#/$defs/reference"},
+        "rack": {"$ref": "#/$defs/reference"},
+        "tenant": {"$ref": "#/$defs/reference"},
+        "platform": {"$ref": "#/$defs/reference"},
+        "serial": {"type": "string"},
+        "asset_tag": {"type": "string"},
+        "description": {"type": "string"},
+        "primary_ip4": {"$ref": "#/$defs/ip"},
+        "primary_ip6": {"$ref": "#/$defs/ip"},
+        "tags": {"type": "array", "items": {"$ref": "#/$defs/reference"}},
+        "custom_fields": {"type": "object", "additionalProperties": true}
+      }
+    },
+    "typed_device_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": {"const": "dcim.device"},
+        "id": {"type": "integer", "minimum": 1}
+      }
+    },
+    "typed_interface_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": {"const": "dcim.interface"},
+        "id": {"type": "integer", "minimum": 1}
+      }
+    },
+    "interface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "device"],
+      "properties": {
+        "id": {"type": "integer", "minimum": 1},
+        "name": {"type": "string", "minLength": 1},
+        "device": {"$ref": "#/$defs/typed_device_reference"},
+        "description": {"type": "string"},
+        "mac_address": {"type": "string"},
+        "mtu": {"type": "integer"},
+        "enabled": {"type": "boolean"},
+        "custom_fields": {"type": "object", "additionalProperties": true}
+      }
+    },
+    "ip_address": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "address", "assigned_object"],
+      "properties": {
+        "id": {"type": "integer", "minimum": 1},
+        "address": {"type": "string", "minLength": 1},
+        "assigned_object": {"$ref": "#/$defs/typed_interface_reference"},
+        "dns_name": {"type": "string"},
+        "description": {"type": "string"},
+        "status": {"$ref": "#/$defs/status"},
+        "role": {"$ref": "#/$defs/reference"},
+        "tenant": {"$ref": "#/$defs/reference"},
+        "custom_fields": {"type": "object", "additionalProperties": true}
+      }
+    }
+  }
+}

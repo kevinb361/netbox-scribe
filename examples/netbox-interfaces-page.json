@@ -1,0 +1,23 @@
+{
+  "count": 2,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 20,
+      "name": "ethernet1/1",
+      "device": {"id": 2, "name": "switch-01"},
+      "description": "Synthetic uplink",
+      "last_updated": "2026-07-21T19:00:00Z",
+      "custom_fields": {"private_note": "not exported"}
+    },
+    {
+      "id": 10,
+      "name": "wan0",
+      "device": {"id": 1, "name": "router-01"},
+      "description": "Synthetic WAN",
+      "last_updated": "2026-07-21T18:30:00Z",
+      "custom_fields": {}
+    }
+  ]
+}

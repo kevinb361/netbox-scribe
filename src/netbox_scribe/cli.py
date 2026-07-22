@@ -10,8 +10,8 @@ from pathlib import Path
 
 from netbox_scribe import __version__
 from netbox_scribe.client import NetBoxClient, NetBoxClientError
-from netbox_scribe.exporter import export_devices
-from netbox_scribe.policy import ExportPolicy
+from netbox_scribe.exporter import NetworkExportCounts, export_devices, export_network
+from netbox_scribe.policy import ExportPolicy, NetworkExportPolicy, ResourcePolicy
 from netbox_scribe.validation import SnapshotValidationError, validate_snapshot_text
 
 
@@ -32,16 +32,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Export canonical inventory from NetBox",
     )
     export_parser.add_argument(
+        "--view",
+        choices=("devices", "network"),
+        default="devices",
+        help="Canonical inventory view (default: %(default)s)",
+    )
+    export_parser.add_argument(
         "--output",
         type=Path,
-        default=Path("snapshot/inventory/devices.yaml"),
-        help="Canonical device YAML path (default: %(default)s)",
+        help="Canonical YAML path (default: devices.yaml or network.yaml for the selected view)",
     )
     export_parser.add_argument(
         "--agent-index",
         type=Path,
-        default=Path("snapshot/agent/INDEX.md"),
-        help="Derived Markdown agent index path (default: %(default)s)",
+        help="Derived Markdown index path (default: INDEX.md or NETWORK.md for the selected view)",
     )
     export_parser.add_argument(
         "--allow-insecure-http",
@@ -52,6 +56,15 @@ def build_parser() -> argparse.ArgumentParser:
     export_parser.add_argument("--exclude-field", action="append", default=[])
     export_parser.add_argument("--include-custom-field", action="append", default=[])
     export_parser.add_argument("--exclude-custom-field", action="append", default=[])
+    for resource in ("interface", "ip-address"):
+        export_parser.add_argument(f"--include-{resource}-field", action="append", default=[])
+        export_parser.add_argument(f"--exclude-{resource}-field", action="append", default=[])
+        export_parser.add_argument(
+            f"--include-{resource}-custom-field", action="append", default=[]
+        )
+        export_parser.add_argument(
+            f"--exclude-{resource}-custom-field", action="append", default=[]
+        )
     validate_parser = subcommands.add_parser(
         "validate",
         help="Validate a canonical snapshot against its published schema",
@@ -78,13 +91,30 @@ def main(argv: Sequence[str] | None = None) -> int:
                 include_custom_fields=frozenset(args.include_custom_field),
                 exclude_custom_fields=frozenset(args.exclude_custom_field),
             )
+            network_policy = NetworkExportPolicy(
+                interfaces=ResourcePolicy(
+                    include_fields=frozenset(args.include_interface_field),
+                    exclude_fields=frozenset(args.exclude_interface_field),
+                    include_custom_fields=frozenset(args.include_interface_custom_field),
+                    exclude_custom_fields=frozenset(args.exclude_interface_custom_field),
+                ),
+                ip_addresses=ResourcePolicy(
+                    include_fields=frozenset(args.include_ip_address_field),
+                    exclude_fields=frozenset(args.exclude_ip_address_field),
+                    include_custom_fields=frozenset(args.include_ip_address_custom_field),
+                    exclude_custom_fields=frozenset(args.exclude_ip_address_custom_field),
+                ),
+            )
         except ValueError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
+        default_output, default_index = _default_export_paths(args.view)
         return _run_export(
-            args.output,
-            args.agent_index,
+            args.output or default_output,
+            args.agent_index or default_index,
             policy,
+            network_policy,
+            view=args.view,
             allow_insecure_http=args.allow_insecure_http,
         )
     if args.command == "validate":
@@ -92,6 +122,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     parser.print_help()
     return 0
+
+
+def _default_export_paths(view: str) -> tuple[Path, Path]:
+    if view == "network":
+        return Path("snapshot/inventory/network.yaml"), Path("snapshot/agent/NETWORK.md")
+    return Path("snapshot/inventory/devices.yaml"), Path("snapshot/agent/INDEX.md")
 
 
 def _run_validate(snapshot: Path) -> int:
@@ -111,7 +147,9 @@ def _run_export(
     output: Path,
     agent_index: Path,
     policy: ExportPolicy,
+    network_policy: NetworkExportPolicy,
     *,
+    view: str,
     allow_insecure_http: bool,
 ) -> int:
     base_url = os.environ.get("NETBOX_URL")
@@ -126,14 +164,35 @@ def _run_export(
             token,
             allow_insecure_http=allow_insecure_http,
         ) as client:
-            count = export_devices(client, output, agent_index=agent_index, policy=policy)
+            if view == "network":
+                counts = export_network(
+                    client,
+                    output,
+                    agent_index=agent_index,
+                    policy=network_policy,
+                    device_policy=policy,
+                )
+            else:
+                count = export_devices(client, output, agent_index=agent_index, policy=policy)
     except (NetBoxClientError, SnapshotValidationError, OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    noun = "device" if count == 1 else "devices"
-    print(f"Exported {count} {noun} to {output}")
+    if view == "network":
+        print(f"Exported network: {_network_summary(counts)} to {output}")
+    else:
+        noun = "device" if count == 1 else "devices"
+        print(f"Exported {count} {noun} to {output}")
     return 0
+
+
+def _network_summary(counts: NetworkExportCounts) -> str:
+    parts = [
+        f"{counts.devices} {'device' if counts.devices == 1 else 'devices'}",
+        f"{counts.interfaces} {'interface' if counts.interfaces == 1 else 'interfaces'}",
+        f"{counts.ip_addresses} {'IP address' if counts.ip_addresses == 1 else 'IP addresses'}",
+    ]
+    return ", ".join(parts)
 
 
 if __name__ == "__main__":  # pragma: no cover

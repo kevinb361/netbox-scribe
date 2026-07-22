@@ -5,7 +5,7 @@
 - Source: NetBox
 - Source freshness: 2026-01-02T12:00:00Z
 - Schema version: 1
-- Exporter version: 0.1.0
+- Exporter version: 0.2.0
 - Canonical inventory: [devices.yaml](../inventory/devices.yaml)
 
 ## Devices (2)

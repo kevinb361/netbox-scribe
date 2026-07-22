@@ -1905,3 +1905,825 @@ real URL exists (**F3**, **C1**).
 Per instruction, this audit did not edit `ROADMAP.md` or `STATE.md`, created no remote, repository, or other
 resource, pushed nothing, and rewrote no history. All mutation testing was confined to a throwaway clone in
 a scratch directory. It wrote `.planning/TRACEABILITY.md` and this section only, and committed nothing.
+
+---
+
+## Audit: v0.2 Network Relationships — 2026-07-21 (independent frontier close-out)
+
+> **Superseded** by the post-remediation re-audit at the end of this file. Critical finding C1 below has since
+> been fixed and independently re-verified; its ASSERTED classification of REQ-019 no longer holds. Retained
+> for the finding history (W1–W10, I1–I6 are carried forward and re-checked in the newer entry).
+
+Auditor: Claude Opus 4.8 (`claude-opus-4-8`, 1M context) via Claude Code — independent frontier review of
+work executed locally by a deep model. `.planning/config.json` carries a populated `close_out_auditor`
+(`claude -p --allowedTools Read,Grep,Glob,Bash,Write,Edit --permission-mode acceptEdits`), so no
+frontier-verify-gate warning applies to this project.
+
+Scope: v0.2 Network Relationships — opt-in device → interface → assigned-IP tracer in one deterministic,
+validated, atomic, redacted network document (REQ-014..REQ-019).
+
+Files reviewed: 13 files changed, 585 insertions(+), 41 deletions(-) against `c70a628` (`git diff --shortstat`),
+plus 6 untracked new files not counted by that diff: `src/netbox_scribe/schemas/v1/network.schema.json`,
+`tests/test_network_exporter.py`, `examples/netbox-interfaces-page.json`,
+`examples/netbox-ip-addresses-page.json`, `examples/output/inventory/network.yaml`,
+`examples/output/agent/NETWORK.md`. Effective review surface: 19 files.
+
+Method: nothing was accepted from a checkbox or from a requirement's own `evidence:` note. Three probe suites
+(A: retrieval/publication edges; B: 26-check CLI end-to-end against a loopback HTTP NetBox stub; C: 19
+relationship-integrity record shapes) were written to `/tmp` and executed against the working tree. `make ci`
+→ **48 passed**, all gates clean. A wheel was built and installed into a clean Python 3.11 venv to verify
+schema packaging and validation outside the source tree. No live NetBox was contacted; no GitHub resource was
+touched; `ROADMAP.md` and `STATE.md` were not edited; nothing was committed.
+
+### Correctness
+
+- **[critical] C1 — the operator's device redaction policy is silently discarded in the network view:**
+  `src/netbox_scribe/exporter.py:124` hardcodes `_normalize_device(device, ExportPolicy())`, and
+  `src/netbox_scribe/cli.py:163` forwards only `network_policy` to `export_network()`. The `ExportPolicy`
+  built from `--include-field` / `--exclude-field` / `--include-custom-field` / `--exclude-custom-field` at
+  `cli.py:88-95` is constructed, validated (unknown names still correctly rejected with exit 2), and then
+  dropped for `--view network`.
+
+  Probe B, verbatim: `nbscribe export --view network --exclude-field serial` exited **0** and the resulting
+  `network.yaml` still contained `serial: DEVICE-SERIAL-SHOULD-BE-DENIABLE`. `--include-custom-field
+support_contract` exited 0 and emitted no device custom fields. Both flags are accepted and neither has any
+  effect. There is no warning, no error, and no note in `README.md`.
+
+  This violates `.planning/SPEC.md:270` — "The system SHALL apply explicit field and custom-field policy
+  independently to **devices**, interfaces, and IP addresses" — and REQ-019's own "denied values … never enter
+  published artifacts". Blast radius: every optional device field an operator explicitly denies (`serial`,
+  `asset_tag`, `description`, `primary_ip4`, `primary_ip6`, `site`, `rack`, `tenant`, `platform`, `tags`)
+  reaches a Git-committed, RAG-ingested artifact anyway. Mitigating: device **custom** fields remain
+  closed-by-default, so no custom-field value leaks; the exposure is limited to standard fields the operator
+  asked to withhold. It is still a silent redaction bypass in a tool whose stated purpose is publishing
+  infrastructure context to Git and agents, and silence is what makes it critical rather than a warning.
+
+  Fix: give `render_network_yaml` a device-policy parameter, thread it from `export_network` and `cli.py`,
+  and add a CLI test asserting the denied value is absent from `network.yaml`. Roughly five lines plus a test.
+
+- **[warning] W1 — documented scope filtering is delegated to the server and is actually a hard abort:**
+  `README.md:127` states "The network view excludes unassigned and VM-assigned addresses", and `SPEC.md`
+  scenario `relationship-scope` says only device-assigned addresses "enter `network.yaml`". The implementation
+  does not filter: `client.py:83-85` appends `?assigned_object_type=dcim.interface` and trusts NetBox to
+  honour it; if any non-`dcim.interface` record comes back, `exporter.py:351-352` raises and the **entire**
+  export fails. Probe C confirmed the abort. On a NetBox version or proxy that ignores the parameter the
+  operator gets a total export failure where the documentation promised an exclusion. Either filter
+  client-side and document it, or change the wording to "requests only device-assigned addresses and rejects
+  anything else".
+
+- **[info] I1 — freshness is a lexical string maximum:** `exporter.py:110-116` takes `max()` over raw
+  `last_updated` strings across all three collections. Mixed offsets or formats sort incorrectly. Consistent
+  with the pre-existing device index, so not a regression, but the network view now mixes three resources
+  whose timestamp formats are not guaranteed to agree.
+
+### Safety
+
+- **[warning] W2 — pagination is bounded against loops but not against length:** `client.py:88-111` rejects a
+  repeated URL and a cross-origin `next`, but has no page cap, no record cap and no elapsed-time cap. Probe A
+  fed distinct `next` URLs and the client followed **5001 pages and accumulated 5000 records without
+  stopping**; `seen_urls` also grows one `httpx.URL` per page. A misbehaving, compromised or simply
+  pathological NetBox drives unbounded memory and runtime. Pre-existing from v0.1, but REQ-014 now applies the
+  same loop to three endpoints instead of one, so the exposure tripled inside this milestone. A
+  `max_pages` guard with a clear `NetBoxResponseError` is cheap.
+
+- **[warning] W4 — "atomic pair" is in-process only, and the rename is not durable:**
+  `exporter.py:151-168` fsyncs the temporary file but never fsyncs the parent directory after `os.replace`,
+  so the rename itself can be lost on power failure. `exporter.py:171-193` publishes the index first and the
+  canonical second with no journal, marker or generation stamp, and rolls back only on `OSError`. A `SIGKILL`,
+  OOM kill or power loss between the two `os.replace` calls leaves a new index paired with an old canonical
+  **permanently and undetectably** — nothing in the artifacts records which generation each file belongs to.
+  REQ-017's "a failure preserves the complete prior pair" holds for in-process `OSError` and for the
+  integrity-abort path (both verified), not for process death. Worth stating explicitly in `README.md` at
+  minimum; decision 0003's override path already contemplates generation stamps if this matters later.
+
+- **[info] I2 — index injection is handled:** Probe C fed NetBox-controlled names containing embedded newlines
+  and backticks through `render_network_index`. `agent_index.py:98-101` collapses newlines and switches to a
+  double-backtick delimiter, so a hostile interface name cannot forge index bullets. Called out because it is
+  the kind of thing that is usually missing and is not mentioned in the requirement evidence.
+
+### Test Coverage
+
+- **[warning] W3 — REQ-014's headline claim ("retrieves every page") has no regression test on the two new
+  endpoints:** `tests/test_client.py::test_list_network_records_retrieves_each_relationship_resource` returns
+  `"next": None` for all three resources; `tests/test_cli.py::test_network_view_fetches_relationships_…` is
+  single-page too. Multi-page interface and IP retrieval is proven only by this audit's Probe A. The behavior
+  is correct today because `_list_records` is shared with the device path, but nothing in the suite would
+  catch a future per-resource retrieval change that breaks paging for interfaces or addresses.
+
+- **[warning] W5 — same-origin and loop guards are untested on the relationship endpoints:** every hostile
+  pagination test in `tests/test_client.py` targets `api/dcim/devices/`. REQ-014 explicitly claims the
+  controls apply "to every resource" and `SPEC.md:201` repeats it. Probe A verified it; the suite does not.
+
+- **[warning] W6 — the two rollback edge cases deferred from the v0.1 audit into v0.2 are still untested:**
+  `STATE.md` "Deferred" carries "test rollback double-fault/no-prior-index" as a v0.2 follow-up. Neither
+  exists in `tests/`. Probe A verified both behave correctly — first-run failure leaves no orphan index and no
+  canonical; the double fault raises `canonical publication failed and the prior agent index could not be
+restored` and preserves the prior canonical. So this is a discharge-of-commitment gap, not a defect: the
+  code is right, the guard is missing.
+
+- **[warning] W7 — no test covers a server that ignores the assignment filter:** see W1. No fixture returns an
+  unassigned or `virtualization.vminterface` address from the client layer, so the documented scope guarantee
+  is unexercised end to end.
+
+- **[info] I3 — where coverage is genuinely strong:** relationship integrity is the best-tested part of this
+  milestone. Probe C's 19 hostile record shapes — dangling both directions, duplicate ids in all three
+  collections, string/bool/zero/negative/missing ids, empty address, wrong and missing `assigned_object_type`
+  — all failed closed with specific messages before any write, and the prior pair survived intact.
+
+### Architecture Fit
+
+- **[warning] W8 — two policy types with opposite defaults is what made C1 invisible:** `ExportPolicy`
+  (`policy.py:67-88`) defaults `include_fields=None`, meaning "all optional fields allowed"; `ResourcePolicy`
+  (`policy.py:32-45`) defaults `include_fields=frozenset()`, meaning "nothing allowed". The network view mixes
+  both — devices through the open-by-default type, interfaces and IPs through the closed-by-default one. A
+  reviewer scanning `render_network_yaml` sees `ExportPolicy()` and reads it as "the default policy" rather
+  than "the operator's policy has been discarded". Whatever fix lands for C1, the two types should either be
+  unified or the asymmetry should be named in a comment at `exporter.py:124`.
+
+- **[info] I4 — the shared publication boundary was reused correctly:** `export_network` reuses
+  `_publish_snapshot_pair` unchanged, and generalizing `list_devices` into `_list_records` was a clean
+  extraction with no behavior change on the device path (Probe B confirmed byte-identical device output). The
+  index is derived from the **validated** document rather than from raw records, which is the right coupling.
+  Decision 0003's unified-document choice is honoured by the implementation.
+
+### Operability
+
+- **[warning] W9 — the double-fault error discards both underlying causes:** `exporter.py:190-192` raises a
+  new `OSError` with `from None`, dropping the original canonical failure and the restore failure. The
+  operator gets no errno and no path. Worse, at that moment `NETWORK.md` holds the **new** content while
+  `network.yaml` holds the **old** content (Probe A captured exactly this state), and the message does not say
+  which file is stale or which one to restore. Chain the original exception and name both paths.
+
+- **[warning] W10 — v0.2 artifacts are stamped `Exporter version: 0.1.0`:** `pyproject.toml:9` and
+  `__init__.py` still carry `0.1.0`, so every `NETWORK.md` this milestone produces claims to come from a build
+  that cannot produce network views at all. REQ-018 requires the index to state the exporter version precisely
+  so a consumer can reason about the artifact; right now that field cannot distinguish v0.1.0 output from v0.2
+  output. Bump before close or before any tag.
+
+- **[info] I5 — no structured logging, still:** `STATE.md` carries "add structured logging" as a deferred v0.1
+  follow-up. A failed network export prints one line to stderr and exits 1; there is no record of how many
+  pages were fetched per resource, which is exactly what an operator would want when a large export dies
+  partway. Not blocking; noted because W2 makes it more relevant than it was in v0.1.
+
+- **[info] I6 — the public-readiness gate cannot see this milestone yet:** `scripts/check_public_readiness.py`
+  enumerates `git ls-files`, so all six new v0.2 files are invisible to it until they are committed. The
+  `tests/test_examples.py` leak scan reads `examples/` from the filesystem and does cover the four new example
+  artifacts. `network.schema.json` and `test_network_exporter.py` are covered by neither; this audit scanned
+  both by hand for RFC 1918 ranges, operator/host identifiers and mail addresses — clean. Re-run
+  `make public-check` after the first commit of this milestone.
+
+### ASSERTED Items from TRACEABILITY.md
+
+- **REQ-019 — confirmed gap.** The audit did not find the missing evidence; it found the counter-evidence.
+  `--exclude-field serial` is accepted and ignored in the network view (finding C1). The interface and
+  IP-address half of the requirement is genuinely proven — closed-by-default omission of 7 optional values,
+  deny-precedence on all four flag families, unknown-field rejection with exit 2, zero token leakage into
+  artifacts, stdout or stderr, and production-generated public-safe fixtures. The device half is not.
+
+### Verdict
+
+**PASS-CONDITIONAL** — do not mark v0.2 shipped until C1 is fixed and `/saga-verify` is re-run.
+
+- Critical findings: **1** (C1 — must fix before milestone close)
+- Warnings: **10** (W1–W10 — fix before shipping; W3/W5/W6 are the coverage items that would have caught this
+  class of defect locally)
+- Info: **6** (I1–I6 — track for later)
+
+Assessment: five of six v0.2 requirements are independently proven from behavior, and REQ-016's integrity
+layer is stronger than its evidence note claims — 19 hostile record shapes all fail closed before publication,
+which is the hard part of a relationship tracer and it was done well. The atomic-pair boundary was reused
+rather than reinvented, the index is derived from the validated document, and Markdown injection from
+NetBox-controlled names is already neutralized. The determinism, packaging and public-safety claims survived
+being re-derived from a clean wheel install.
+
+The single critical defect is not in the new relationship code at all — it is the seam where the new
+publication path meets the old device normalizer. `render_network_yaml` calls `_normalize_device(device,
+ExportPolicy())` and the operator's policy never arrives. Every local test passes because no local test asks
+the network view to honour a device denial, and the requirement text itself only names interfaces and IP
+addresses, so the checkbox was defensible on its own wording. `SPEC.md:270` is not, and it names devices
+explicitly.
+
+That is the general shape of the risk here: the milestone was verified against the sentence it wrote for
+itself rather than against the sentence it inherited. The fix is small. The habit worth keeping is that a new
+publication path must re-prove **every** redaction guarantee the old one made, not only the new ones.
+
+Per instruction, this audit did not edit `ROADMAP.md` or `STATE.md`, did not commit, push, mutate any GitHub
+resource, or contact a live NetBox. All probes ran against loopback stubs and mock transports in scratch
+directories. It wrote `.planning/TRACEABILITY.md` and this section only.
+
+---
+
+## Audit: v0.2 Network Relationships — 2026-07-21 (post-remediation re-audit of C1 / REQ-019)
+
+Auditor: Claude Opus 4.8 (`claude-opus-4-8`) via Claude Code — independent frontier re-audit after the local
+remediation of critical finding C1. Supersedes the v0.2 close-out entry above. `.planning/config.json` carries
+a populated `close_out_auditor`, so no frontier-verify-gate warning applies to this project.
+
+Scope: v0.2 Network Relationships — opt-in device → interface → assigned-IP tracer in one deterministic,
+validated, atomic, redacted network document (REQ-014..REQ-019).
+
+Files reviewed: 10 tracked files changed, 588 insertions(+), 16 deletions(-) against `c70a628`
+(`git diff HEAD --shortstat`), plus 6 untracked new files not counted by that diff
+(`src/netbox_scribe/schemas/v1/network.schema.json` 125L, `tests/test_network_exporter.py` 185L,
+`examples/netbox-interfaces-page.json` 23L, `examples/netbox-ip-addresses-page.json` 25L,
+`examples/output/inventory/network.yaml` 69L, `examples/output/agent/NETWORK.md` 18L). Effective review
+surface: **16 files** — under the 50-file single-pass limit.
+
+Method: nothing was accepted from the remediation note, from `STATE.md`, from a checkbox, or from a
+requirement's own `evidence:` note. The prior pass's ASSERTED classification of REQ-019 was itself treated as
+unproven and re-tested from scratch. Two wheels were built — one from the working tree and one from
+`git archive HEAD` (the pre-v0.2 code) — and installed into two separate clean Python 3.11 venvs. **All 41
+CLI invocations below drive an installed `nbscribe` binary as a subprocess against a loopback HTTP NetBox
+stub on `127.0.0.1`, not the source tree.** Four probe suites, 68 assertions, all passing:
+
+- **R1** — redaction through the public CLI (39 checks, 12 exports).
+- **R2** — device-view regression, working-tree build vs. pre-v0.2 build (5 cases, 10 exports).
+- **R3** — relationship integrity and atomicity (19 checks, 18 exports, 14 hostile record shapes).
+- **R4** — adversarial leak hunt with a device canary echoed back through nested relationship blobs (5 checks).
+
+`make ci` re-run: `black --check` clean (17 files), `ruff` clean, `mypy` clean (16 source files),
+`pytest -n auto` → **48 passed**, `public-check` → _Public readiness checks passed (46 tracked files)_. Saga
+spine lint clean, exit 0.
+
+### Correctness
+
+- **[resolved] C1 — device redaction policy now reaches the network publication path.** The previous audit
+  found `render_network_yaml` hardcoding `_normalize_device(device, ExportPolicy())`, so
+  `--exclude-field serial` was accepted and silently ignored under `--view network`. The fix threads a
+  `device_policy` parameter through `export_network` (`exporter.py:75-85`) into `render_network_yaml`
+  (`exporter.py:120-130`), and `cli.py:162-169` forwards the operator's `ExportPolicy` as `device_policy=`.
+  Independently re-verified through the installed CLI, not by reading the diff:
+
+  | Probe | Command (abbreviated)                                                                                                                       | Result                                                                                                                                                                                    |
+  | ----- | ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | R1-P1 | `--view network --exclude-field serial`                                                                                                     | exit 0; denied serial absent from `network.yaml`, `NETWORK.md`, stdout and stderr; non-denied `asset_tag` still present, so the exclusion is targeted rather than a wholesale device wipe |
+  | R1-P2 | `--view network --include-custom-field owner`                                                                                               | `owner` values present; `secret_note` and `billing_code` absent as both keys and values on every surface                                                                                  |
+  | R1-P3 | `--view network` (no custom-field flags)                                                                                                    | zero device custom fields — closed by default, as on the device view                                                                                                                      |
+  | R1-P4 | `--include-custom-field owner --exclude-custom-field owner`                                                                                 | deny wins; value absent                                                                                                                                                                   |
+  | R1-P5 | `--view network --include-field site`                                                                                                       | allowlist honoured; `serial` and `asset_tag` values dropped                                                                                                                               |
+  | R4    | canary in 8 device fields, echoed back inside the interface record's nested `device` blob and the IP record's nested `assigned_object` blob | zero occurrences on any surface; published document reduced to `id`/`name` plus typed references                                                                                          |
+
+  R4 is the check that matters most: it closes the sideways route. `_normalize_interface`
+  (`exporter.py:336-349`) and `_normalize_ip_address` (`exporter.py:352-374`) extract only
+  `{"type", "id"}` from their parent references, so a NetBox brief-serializer that inlines the whole device
+  object into the interface payload cannot smuggle a denied device value back in.
+
+- **[resolved] plain device export is unchanged.** R2 ran the same loopback stub, the same five argument
+  shapes, against the pre-v0.2 wheel and the working-tree wheel, comparing exit code, `devices.yaml`,
+  `INDEX.md`, stdout and stderr. **5/5 byte-identical**, including the policy cases (`--exclude-field serial`,
+  `--include-custom-field owner`, `--include-field` allowlisting, deny precedence). REQ-014's
+  "without changing plain `nbscribe export`" is now proven by differential comparison against the actual
+  prior build, not by inspection.
+
+- **[warning] W11 (new) — the public guidance still does not say device flags apply to `--view network`.**
+  `README.md:117-138` documents the network view and the `--include-interface-*` / `--include-ip-address-*`
+  families, but never states that `--exclude-field` / `--include-custom-field` also govern the devices inside
+  `network.yaml`. That silence is exactly the gap C1 lived in: an operator reading only the network section
+  has no reason to believe device redaction applies there, and REQ-019 explicitly claims _public guidance_
+  proves denied values never enter published artifacts. One sentence fixes it.
+
+### Safety
+
+- **[info] I7 (new) — the closed-by-default asymmetry is unchanged but is now correctly overridden.** Device
+  optional fields remain open-by-default (`ExportPolicy.include_fields = None`) while interface and IP
+  optional fields are closed-by-default (`ResourcePolicy.include_fields = frozenset()`). That means a bare
+  `nbscribe export --view network` still publishes device `serial`, `asset_tag`, `description` and so on. This
+  is deliberate parity with the device view and is not a regression — but combined with W11 it is the shape an
+  operator is most likely to get wrong.
+
+- **[warning] W1 (carried, re-checked) — an out-of-scope address aborts the export rather than being skipped.**
+  `README.md:126` says the network view "excludes unassigned and VM-assigned addresses". The exclusion is
+  server-side (`?assigned_object_type=dcim.interface`); client-side, `_normalize_ip_address`
+  (`exporter.py:357-358`) _raises_ on anything else. R3 confirmed: a `virtualization.vminterface` address and
+  an address with no `assigned_object_type` both exit 1 with
+  `IP address 100 is not assigned to a device interface`, and the whole export is lost. Failing closed is the
+  right default for a redaction-sensitive tool, but a NetBox version that ignores or renames that query
+  parameter turns a filter into an outage, and the README's wording does not warn about it.
+
+- **[warning] W4 (carried) — the atomic pair is not crash-durable.** `_publish_snapshot_pair`
+  (`exporter.py:177-199`) performs two independent `os.replace` calls. Process death between them leaves a new
+  `NETWORK.md` paired with an old `network.yaml` permanently and undetectably; nothing in the artifacts stamps
+  a generation. Holds for in-process `OSError` (tested) and for the integrity-abort path (R3 confirmed across
+  14 shapes), not for power loss. Unchanged this pass.
+
+- **[info] I8 (new) — device `name` cannot be redacted, in either view.** `_normalize_device`
+  (`exporter.py:293-295`) exempts `id` and `name` from policy, and `network.schema.json` requires both with
+  `minLength: 1`. Correct — the relationship graph is meaningless without stable identities — but it means the
+  tool cannot produce a hostname-anonymized export, which is worth stating before anyone points it at a
+  customer inventory.
+
+### Test Coverage
+
+- **[warning] W12 (new) — the C1 regression guard does not leak-scan the index.**
+  `tests/test_cli.py:135-213` is the only test that would catch a device-policy regression in the network
+  view. It asserts `"denied-network-serial" not in output.read_text()` and the same for the denied custom
+  value — both against `network.yaml` only. `index_text` is asserted positively (freshness, hierarchy) but is
+  never scanned for the denied values. The index happens to be safe because it renders from the validated
+  document (R1/R4 confirmed), but the guard for the defect that just shipped a critical finding covers one of
+  the two published artifacts. Add `assert "denied-network-serial" not in index_text` and the same for the
+  custom value; it is a two-line change.
+
+- **[warning] W13 (new) — no exporter-layer test asserts `device_policy` is honoured.**
+  `tests/test_network_exporter.py` has five tests; none passes `device_policy` to `export_network` or
+  `render_network_yaml`. The regression guard exists only at the CLI layer. More pointedly,
+  `tests/test_examples.py:62` calls `export_network(client, output, agent_index=index, policy=policy)` with
+  no `device_policy` — the repository's own example generator exercises the open-default path, and
+  `examples/output/inventory/network.yaml:15` accordingly publishes `serial: SYNTHETIC-001`. Harmless with
+  synthetic data, but it means the shipped example demonstrates the network view _without_ device redaction.
+
+- **[warning] W3 (carried, still open) — REQ-014's "retrieves every page" has no regression test on the two
+  new endpoints.** `tests/test_client.py:54-100` still returns `"next": None` for all three resources, and the
+  CLI network test is single-page. R1 proved two-page retrieval on all three endpoints through the installed
+  binary; the suite would not catch a future per-resource retrieval change that breaks paging.
+
+- **[warning] W5 (carried, still open) — same-origin and loop guards remain untested on the relationship
+  endpoints.** Every hostile-pagination test in `tests/test_client.py` targets `api/dcim/devices/`. REQ-014
+  and `SPEC.md:201` both claim the controls apply to every resource. The behavior is correct because
+  `_list_records` is shared, but nothing pins that.
+
+- **[warning] W6 (carried, still open) — the two rollback edge cases deferred from the v0.1 audit are still
+  untested.** `STATE.md` "Deferred" carries "test rollback double-fault/no-prior-index" as a v0.2 follow-up.
+  Neither exists in `tests/`. Behavior was verified correct by the previous audit's Probe A; the guard is
+  missing.
+
+- **[warning] W7 (carried, still open) — no test covers a server that ignores the assignment filter.** See W1.
+  No client-layer fixture returns an unassigned or VM-assigned address, so the documented scope guarantee is
+  unexercised end to end.
+
+- **[info] I3 (carried, re-confirmed) — relationship integrity remains the best-tested part of the milestone.**
+  R3 drove 14 hostile record shapes through the _public CLI_ this pass (the previous audit drove 19 through
+  the render function). All 14 exited 1 with a specific `error:` line, no traceback, and left both prior
+  artifacts byte-identical; a subsequent good export recovered cleanly. `--output`/`--agent-index` collision is
+  rejected, and `nbscribe validate` accepts the published `network.yaml` from a clean venv.
+
+### Architecture Fit
+
+- **[warning] W8 (carried, partially addressed) — the two-policy asymmetry is now in the public signature.**
+  The fix is minimal and correct, but `export_network(client, output, *, agent_index, policy, device_policy)`
+  now takes **two** policy objects with **opposite defaults**: `policy=None` → `NetworkExportPolicy()` = fully
+  closed for interfaces and IPs; `device_policy=None` → `ExportPolicy()` = fully **open** for devices. A
+  library caller who carefully constructs a closed `NetworkExportPolicy` and forgets `device_policy` gets the
+  exact C1 behavior back. `tests/test_examples.py:62` is that caller today (W13). The durable fix is to fold
+  devices into the policy object — `NetworkExportPolicy(devices=..., interfaces=..., ip_addresses=...)` — so
+  there is one policy argument and one default. Failing that, a comment at `exporter.py:129` naming the
+  asymmetry is the minimum.
+
+- **[info] I4 (carried, re-confirmed) — the shared publication boundary is still reused correctly.**
+  `export_network` reuses `_publish_snapshot_pair` unchanged; the index is derived from the **validated**
+  document rather than raw records, which is precisely why the C1 fix propagated to `NETWORK.md` for free.
+  Decision 0003's unified-document choice is honoured.
+
+- **[info] I2 (carried) — index injection remains handled.** `agent_index.py:98-101` collapses newlines and
+  switches to a double-backtick delimiter, so a hostile NetBox-controlled name cannot forge index bullets.
+
+### Operability
+
+- **[close condition] CC1 / W10 — v0.2 artifacts are still stamped `Exporter version: 0.1.0`.**
+  `pyproject.toml:7` remains `version = "0.1.0"`, so `examples/output/agent/NETWORK.md:8` and every
+  `NETWORK.md` this milestone produces claim to come from a build that cannot produce network views at all.
+  REQ-018 requires the index to state the exporter version so a consumer can reason about the artifact; right
+  now that field cannot distinguish v0.1.0 output from v0.2 output. The rendering mechanism is correct — this
+  is release hygiene, but it is a **factually false provenance claim in a v0.2 requirement's own output** and
+  should not survive the milestone close. Bump `pyproject.toml`, regenerate the examples, re-run `make ci`.
+
+- **[close condition] CC2 / I6 — the public-readiness gate has still never seen this milestone.**
+  `make public-check` reported _46 tracked files_ this pass; the six new v0.2 files are untracked and
+  `scripts/check_public_readiness.py` enumerates `git ls-files`. `tests/test_examples.py` reads `examples/`
+  from the filesystem and does cover the four new example artifacts, but `network.schema.json` and
+  `tests/test_network_exporter.py` are covered by neither. This audit scanned both by hand for RFC 1918
+  ranges, operator/host identifiers and mail addresses — clean — but a hand scan is not the gate. Commit the
+  six files and re-run `make public-check` before close.
+
+- **[warning] W9 (carried, still open) — the double-fault error discards both underlying causes.**
+  `exporter.py:196-198` raises a new `OSError` with `from None`, dropping the original canonical failure and
+  the restore failure. No errno, no path, and no statement of which of the two files is stale — at that moment
+  `NETWORK.md` holds new content while `network.yaml` holds old content. Chain the original exception and name
+  both paths.
+
+- **[info] I5 (carried, still open) — no structured logging.** A failed network export prints one line to
+  stderr and exits 1; there is no record of how many pages were fetched per resource. Carried as a deferred
+  v0.1 follow-up in `STATE.md`.
+
+- **[info] I9 (new) — `--output`/`--agent-index` collision is still rejected after the fetch, not before.**
+  R3 confirmed the rejection works (`canonical output and agent index must use different paths`, exit 1), but
+  `export_network` raises it only after `client.list_network_records()` has already pulled all three
+  resources. Carried in `STATE.md` as a v0.1.0 follow-up ("reject output/index path collisions before
+  fetching"); still open. Wasted work, not a safety issue.
+
+### ASSERTED Items from TRACEABILITY.md
+
+- **REQ-019 — gap closed, upgraded to PROVEN.** The previous pass classified this ASSERTED because the audit
+  found counter-evidence: `--exclude-field serial` accepted and ignored in the network view. This pass
+  re-tested the claim from scratch through an installed wheel rather than accepting the remediation note. All
+  six device-policy probes (R1-P1..P5, R4) pass, the interface/IP half re-proves, and the adversarial nested-
+  echo route is closed. The fresh `TRACEABILITY.md` records **0 ASSERTED, 0 OPEN, 0 WAIVED** across all 19
+  requirements.
+
+### Verdict
+
+**PASS-CONDITIONAL** — the critical defect is fixed and independently verified; two mechanical close
+conditions remain before v0.2 may be marked shipped.
+
+- Critical findings: **0** (C1 resolved and re-verified)
+- Close conditions: **2** (CC1 exporter-version bump; CC2 commit the six untracked files and re-run
+  `make public-check`)
+- Warnings: **10** (W1, W3, W5, W6, W7, W8, W9, W11, W12, W13 — of which W11/W12/W13 are new and W12/W13
+  directly guard the defect that was just fixed)
+- Info: **7** (I2, I3, I4, I5, I7, I8, I9 carried or new — track for later)
+
+**Close conditions (must be discharged before v0.2 is marked shipped):**
+
+1. **CC1** — bump `pyproject.toml` off `0.1.0`, regenerate `examples/output/agent/NETWORK.md` and `INDEX.md`,
+   re-run `make ci`. A v0.2 artifact must not claim to come from a build that cannot produce it.
+2. **CC2** — commit the six untracked v0.2 files and re-run `make public-check` so the readiness gate actually
+   covers `network.schema.json` and `tests/test_network_exporter.py`.
+
+**Optional follow-ups (do not block the close; candidates for v0.2.x):**
+
+- W12 — add two leak assertions against `index_text` in `tests/test_cli.py:194-213`.
+- W13 — add an exporter-layer test that `device_policy` is honoured; consider passing one in
+  `tests/test_examples.py` so the shipped example demonstrates device redaction in the network view.
+- W11 — one README sentence stating that `--exclude-field` / `--include-custom-field` also govern devices
+  under `--view network`.
+- W8 — fold devices into `NetworkExportPolicy` so `export_network` takes one policy object with one default,
+  or comment the asymmetry at `exporter.py:129`.
+- W3, W5, W7 — pagination, same-origin and assignment-filter regression tests on the two new endpoints.
+- W6 — the two rollback edge-case tests carried from the v0.1 audit.
+- W9 — chain the original exception and name both paths in the double-fault error.
+- W1 — document that an out-of-scope address aborts rather than being skipped, or degrade to skip-with-count.
+- W4, I5, I8, I9 — durability stamping, structured logging, the un-redactable device name, and pre-fetch path
+  collision rejection.
+
+Assessment: the remediation is small, correct, and lands exactly where the defect was — at the seam where the
+new publication path met the old device normalizer. It was re-verified adversarially rather than accepted:
+R2's differential comparison against a build of the pre-v0.2 code proves the device view did not move, and
+R4's nested-echo canary closes the one route by which a denied device value could have re-entered sideways.
+All six v0.2 requirements are now independently proven from behavior, through an installed wheel, with no
+live NetBox contacted.
+
+The residual risk has shifted from the code to the guards around it. The single test that would catch a C1
+regression scans one of the two published artifacts (W12), the exporter layer has no such test at all (W13),
+and the library signature still has the open-by-default trap that made C1 possible in the first place (W8) —
+with the repository's own example generator sitting in that trap. None of that blocks the close, but if v0.2.x
+extends this model to prefixes, VLANs and cables, those are the guards to build first.
+
+Per instruction, this audit did not edit `ROADMAP.md` or `STATE.md`, did not commit, push, or mutate any
+GitHub resource, and did not contact a live NetBox. All probes ran against loopback stubs in `/tmp` scratch
+directories. It wrote `.planning/TRACEABILITY.md` and this section only.
+
+---
+
+## Audit: v0.2 Network Relationships — 2026-07-21 (close-condition re-audit after CC1 / CC2 remediation)
+
+Auditor: Claude Opus 4.8 (`claude-opus-4-8`) via Claude Code — independent frontier re-audit invoked directly
+by the operator after remediation of the two close conditions. Supersedes the **PASS-CONDITIONAL** entry above.
+`.planning/config.json` carries a populated `close_out_auditor`, so no frontier-verify-gate warning applies.
+
+Scope: v0.2 Network Relationships — opt-in device → interface → assigned-IP tracer in one deterministic,
+validated, atomic, redacted network document (REQ-014..REQ-019), plus discharge of close conditions CC1
+(exporter-version provenance) and CC2 (public-readiness gate coverage).
+
+Files reviewed: 23 staged files against `c70a628` — 17 modified, 6 added, 1624 insertions(+), 156 deletions(-)
+(`git diff HEAD --shortstat`). `git diff` against the index is empty and `git ls-files --others
+--exclude-standard` is empty, so the review surface and the tracked tree are now the same set. Under the
+50-file single-pass limit.
+
+Method: nothing was accepted from `STATE.md`, from a checkbox, from a requirement's own `evidence:` note, or
+from the previous audit's verdict — including its own PASS on REQ-019, which was re-tested from scratch. Two
+wheels were built and installed into two separate clean Python 3.11 venvs: the working tree at 0.2.0 and
+`git archive HEAD` at 0.1.0 (pre-bump). **All 23 CLI invocations below drive an installed `nbscribe` binary as
+a subprocess against loopback HTTP NetBox stubs on `127.0.0.1`, not the source tree.** Two probe suites,
+55 assertions, all passing:
+
+- **V1** — v0.2 behavior and version provenance through the public CLI (35 assertions, 13 invocations).
+- **V2** — differential device-view comparison across the CC1 bump, 0.1.0 wheel vs. 0.2.0 wheel (20
+  assertions, 10 invocations).
+
+One V1 assertion failed on first run and was a probe-authoring error, not a product defect: it expected
+`schema_version: v1` where the canonical form is `schema_version: 1`. Corrected and re-verified.
+
+`make ci` re-run: `black --check` clean (17 files), `ruff` clean, `mypy` clean (16 source files),
+`pytest -n auto` → **48 passed**, `public-check` → _Public readiness checks passed (**52 tracked files**)_.
+Saga spine lint clean, exit 0.
+
+### Close conditions — status
+
+| ID  | Condition                                                                           | Status this pass                                                                                                                                                                                                                                             |
+| --- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CC1 | v0.2 artifacts stamped `Exporter version: 0.1.0`                                    | **DISCHARGED & independently re-verified.** `0.2.0` at 10 version sites plus two freshly generated indexes; the pin is mutation-tested load-bearing at three test sites; V2 proves the bump changed the provenance stamp and nothing else                    |
+| CC2 | Public-readiness gate had never seen the six untracked v0.2 files                   | **DISCHARGED.** `make public-check` enumerates **52 tracked files** (was 46), including `src/netbox_scribe/schemas/v1/network.schema.json` and `tests/test_network_exporter.py`. Untracked set empty; unstaged diff empty. Scan-depth caveat recorded as I10 |
+| C1  | Device redaction policy did not reach the network publication path (prior critical) | **STILL CLOSED.** Re-tested from behavior rather than carried: six device-policy probes plus the nested-echo canary, all through the 0.2.0 wheel                                                                                                             |
+
+### Correctness
+
+- **[resolved] CC1 / W10 — the exporter-version provenance claim is now true.** `pyproject.toml:7` is
+  `version = "0.2.0"`. The chain was re-derived at **10 sites**, all agreeing: `pyproject.toml:7`,
+  `uv.lock:368`, the wheel filename, the sdist filename, the `netbox_scribe-0.2.0.dist-info/` directory, the
+  wheel `METADATA` `Version:` field, the installed `netbox_scribe.__version__`, `nbscribe --version` from a
+  clean venv, `examples/output/agent/INDEX.md:8`, and `examples/output/agent/NETWORK.md:8`. A **fresh** network
+  export from the installed wheel stamps `- Exporter version: 0.2.0` with no `0.1.0` residue on any line, as
+  does a fresh device export. The only surviving `0.1.0` strings in the tracked tree are in
+  `docs/PUBLICATION.md`, where they correctly name the shipped v0.1.0 release tag and its history — not a
+  stale exporter claim.
+
+  **The pin is load-bearing, not cosmetic.** `pyproject.toml` was reverted to `0.1.0` in an isolated copy and
+  the suite re-run: **3 failed, 45 passed** — `tests/test_cli.py::test_version_does_not_require_netbox_credentials`
+  (the literal `assert __version__ == "0.2.0"` at `tests/test_cli.py:40`, which correctly replaced the v0.1.0
+  release's `0.1.0` literal), plus both example byte-comparisons in `tests/test_examples.py`. A future bump
+  cannot silently skip the fixtures.
+
+  **The bump changed nothing else.** Probe V2 ran the 0.1.0 baseline wheel and the 0.2.0 wheel against the same
+  loopback stub across five argument shapes (plain, `--exclude-field serial`, `--include-custom-field owner`,
+  `--include-field site`, deny precedence). `devices.yaml` is **byte-identical in all five**; stdout and stderr
+  are identical in all five; and the `INDEX.md` unified diff is **exactly** `-- Exporter version: 0.1.0` /
+  `+- Exporter version: 0.2.0` in all five. REQ-003 and REQ-006 survive the release-hygiene change by
+  measurement, not assumption.
+
+- **[resolved] C1 remains closed under re-test.** The prior pass's PASS on REQ-019 was not carried. Through the
+  installed 0.2.0 CLI: `--view network --exclude-field serial` → exit 0 with the denied serial absent from
+  `network.yaml`, `NETWORK.md`, stdout **and** stderr while non-denied `asset_tag` survives (targeted, not a
+  wholesale device wipe); `--include-custom-field owner` → `owner` present with `secret_note` and
+  `billing_code` absent as both keys and values; bare `--view network` → zero device custom fields;
+  include+exclude on the same custom field → deny wins; `--include-field site` → `serial` and `asset_tag`
+  dropped. A canary planted in eight device fields (`serial`, `asset_tag`, `description`, `display`,
+  `primary_ip4.dns_name`, `site`, `tags[].name`, `custom_fields.owner`) **and echoed back inside the interface
+  record's nested `device` blob and the IP record's nested `assigned_object` blob** appears **zero** times on
+  any surface. The sideways reentry route stays shut because `_normalize_interface` (`exporter.py:336-349`) and
+  `_normalize_ip_address` (`exporter.py:352-374`) extract only `{"type", "id"}` from their parent references.
+
+- **[warning] W11 (carried, still open) — the public guidance still does not say device flags apply to
+  `--view network`.** `README.md` documents the network view and the `--include-interface-*` /
+  `--include-ip-address-*` families but never states that `--exclude-field` / `--include-custom-field` also
+  govern the devices inside `network.yaml`. Re-confirmed by grep this pass. That silence is the gap C1 lived
+  in. One sentence fixes it. Not a condition on this close.
+
+### Safety
+
+- **[info] I10 (new) — `public-check` enumerates the two new non-example files but does not content-scan
+  them.** CC2 is discharged as written: `scripts/check_public_readiness.py:47-54` builds its set from
+  `git ls-files`, so `network.schema.json` and `tests/test_network_exporter.py` are now inside the gate and
+  subject to its forbidden-path and forbidden-prefix assertions (`.env`, `dist/`, `snapshot/`,
+  `.planning/.close-out-auditor.log`). Worth stating precisely, though: the gate's _content_ checks are the
+  `DESIGN.md` local-path check and the tracked-local-link scan over `*.md` only. So of the six new files, the
+  four under `examples/` are additionally content-scanned by
+  `tests/test_examples.py::test_public_docs_and_examples_contain_no_private_networks_or_credentials` (RFC 1918
+  and credential-assignment regexes over every `examples/` file), and `examples/output/agent/NETWORK.md`
+  additionally has its `../inventory/network.yaml` canonical link resolved by the gate — but
+  `network.schema.json` and `tests/test_network_exporter.py` get enumeration and path assertions only. Both
+  were hand-scanned this pass for RFC 1918 literals, mail addresses, `/home/` paths and operator identifiers:
+  **zero hits**. A hand scan is still not a gate; if the file set grows, extend the content scan beyond
+  `examples/`. Not a blocker — neither file can carry inventory data by construction.
+
+- **[warning] W1 (carried) — an out-of-scope address aborts the export rather than being skipped.**
+  `_normalize_ip_address` (`exporter.py:357-358`) raises on any `assigned_object_type` other than
+  `dcim.interface`, while `README.md` describes it as an exclusion. Failing closed is right for a
+  redaction-sensitive tool, but a NetBox that ignores or renames the `?assigned_object_type=` query parameter
+  turns a filter into an outage. Unchanged this pass.
+
+- **[warning] W4 (carried) — the atomic pair is not crash-durable.** `_publish_snapshot_pair` performs two
+  independent `os.replace` calls; process death between them leaves a new index paired with an old canonical
+  permanently and undetectably. Holds for in-process `OSError` and for the integrity-abort path. Unchanged.
+
+- **[info] I7, I8 (carried) — closed-by-default asymmetry and the un-redactable device `name`.** Device
+  optional fields are open-by-default while interface/IP optional fields are closed-by-default; `id` and
+  `name` are exempt from policy in both views and required by `network.schema.json`. Both deliberate, both
+  unchanged, both worth knowing before pointing the tool at a customer inventory.
+
+- Re-confirmed clean this pass: the token appeared in **no** artifact, stdout or stderr across 23 invocations;
+  the loopback stub genuinely required it (403 otherwise, 3 authenticated requests per network export); no
+  traceback on any surface; the clean-venv binary still refuses `http://` before any request is sent, so every
+  probe had to pass `--allow-insecure-http` explicitly.
+
+### Test Coverage
+
+The suite is unchanged at **48 passed** — the remediation was release hygiene and staging, and it added no
+tests. All prior coverage warnings therefore stand, re-confirmed by grep this pass:
+
+- **[warning] W12 (carried, still open) — the C1 regression guard does not leak-scan the index.**
+  `tests/test_cli.py:204` asserts `"denied-network-serial" not in output.read_text()` against `network.yaml`
+  only; `index_text` (`tests/test_cli.py:194-198`) is asserted positively for freshness and hierarchy but never
+  scanned for the denied values. The index is safe in fact — V1 confirmed it — but the guard for the defect
+  that shipped a critical finding still covers one of the two published artifacts. Two lines.
+- **[warning] W13 (carried, still open) — no exporter-layer test asserts `device_policy` is honoured.**
+  `grep -rn device_policy tests/` returns nothing. `tests/test_examples.py:62` still calls `export_network(...)`
+  without it, so `examples/output/inventory/network.yaml:18` publishes `serial: SYNTHETIC-001` — the shipped
+  example demonstrates the network view _without_ device redaction. Harmless with synthetic data; it means the
+  repository's own example generator sits in the W8 trap.
+- **[warning] W3, W5, W7 (carried, still open) — pagination, same-origin and assignment-filter regression tests
+  are still absent on the two new endpoints.** V1 proved two-page retrieval on all three endpoints through the
+  installed binary this pass, but `tests/test_client.py` still returns `"next": None` for all three and every
+  hostile-pagination test still targets `api/dcim/devices/`. The behavior is correct because `_list_records` is
+  shared; nothing pins that.
+- **[warning] W6 (carried, still open) — the two rollback edge cases from the v0.1 audit remain untested.**
+- **[info] I11 (new) — version-fixture brittleness is now measured.** The mutation test quantifies the TC-C
+  concern carried since v0.1: a version bump reds **three** tests and requires regenerating **two** committed
+  fixtures. Recording it as a measured cost rather than a defect, because it is the same mechanism that makes
+  CC1's remediation load-bearing. If the cost ever justifies removing it, replace the byte-compare with a
+  version-normalized compare — do not simply drop the assertion.
+
+### Architecture Fit
+
+- **[warning] W8 (carried, partially addressed) — the two-policy asymmetry is still in the public signature.**
+  `export_network(client, output, *, agent_index, policy, device_policy)` takes two policy objects with
+  opposite defaults: `policy=None` → fully closed for interfaces and IPs, `device_policy=None` → fully **open**
+  for devices. A library caller who builds a closed `NetworkExportPolicy` and forgets `device_policy` gets the
+  exact C1 behavior back; `tests/test_examples.py:62` is that caller today. Durable fix: fold devices into the
+  policy object so there is one argument and one default. Unchanged this pass.
+- **[info] I4 (carried, re-confirmed) — the shared publication boundary is still reused correctly.**
+  `export_network` reuses `_publish_snapshot_pair` unchanged and the index renders from the **validated**
+  document, which is why the C1 fix propagated to `NETWORK.md` for free and why the canary probe finds nothing
+  in it. Decision 0003's unified-document choice is honoured.
+- **[info] I2 (carried) — index injection remains handled.** `agent_index.py:98-101` collapses newlines and
+  switches to a double-backtick delimiter.
+
+### Operability
+
+- **[resolved] CC2 / I6 — the public-readiness gate now covers the milestone.** `make public-check` reports
+  _Public readiness checks passed (52 tracked files)_, up from 46. `git ls-files` confirms all six former
+  untracked files are tracked: `src/netbox_scribe/schemas/v1/network.schema.json`,
+  `tests/test_network_exporter.py`, `examples/netbox-interfaces-page.json`,
+  `examples/netbox-ip-addresses-page.json`, `examples/output/inventory/network.yaml`,
+  `examples/output/agent/NETWORK.md`. `git ls-files --others --exclude-standard` is empty and `git diff`
+  against the index is empty, so **no** v0.2 artifact sits outside the gate. `.env`, `snapshot/` and `dist/`
+  remain untracked and are re-asserted forbidden by the gate itself. See I10 for scan depth.
+- **[warning] W9 (carried, still open) — the double-fault error discards both underlying causes.**
+  `exporter.py:196-198` raises a new `OSError` `from None` with no errno, no path, and no statement of which
+  file is stale.
+- **[info] I5, I9 (carried, still open) — no structured logging; the `--output`/`--agent-index` collision is
+  still rejected after the fetch rather than before.** Both are on `STATE.md` as deferred follow-ups.
+
+### ASSERTED Items from TRACEABILITY.md
+
+None. The fresh `TRACEABILITY.md` written this pass records **0 ASSERTED, 0 OPEN, 0 WAIVED** across all 19
+requirements, and every v0.2 row was re-derived by executing the built artifact rather than carried from the
+previous pass's verdict.
+
+One accuracy note, unchanged: the `make ci with N tests` counts embedded in several `REQUIREMENTS.md`
+`evidence:` notes are historical snapshots from when each slice landed (13, 19, 20, 32, 33, 39, 41, 42, 45, 46,
+48). The suite is 48 today. Every named artifact resolves, so no classification changes.
+
+### Verdict
+
+**PASS** — both close conditions are discharged and independently re-verified. v0.2 closes clean.
+
+- Critical findings: **0**
+- Close conditions: **0** (CC1 and CC2 both discharged)
+- Warnings: **10** (W1, W3, W5, W6, W7, W8, W9, W11, W12, W13 — all carried, none new, none blocking)
+- Info: **9** (I2, I4, I5, I7, I8, I9 carried; I10 and I11 new)
+
+v0.2 requirement counts: **6 PROVEN** (REQ-014..REQ-019), 0 ASSERTED, 0 OPEN, 0 WAIVED.
+Whole-project counts: **19 PROVEN**, 0 ASSERTED, 0 OPEN, 0 WAIVED.
+
+Rationale: both conditions were mechanical, and both were verified mechanically rather than by reading the
+diff. CC1 is not just "the number changed" — the version agrees at ten independent sites including the built
+wheel's own metadata, a fresh export from that wheel stamps it, three tests go red when it is reverted, and a
+differential run against a wheel built from the pre-bump code proves the bump moved the provenance line and
+nothing else. That last check is the one that matters: a release-hygiene edit is exactly the kind of change
+that quietly perturbs deterministic output, and it did not. CC2 is discharged by the gate's own count moving
+46 → 52 with an empty untracked set and an empty unstaged diff, so the enumeration is complete rather than
+merely larger. C1 was re-tested from scratch rather than carried, including the nested-echo route by which a
+denied device value could re-enter sideways, and it stays shut.
+
+The residual risk is unchanged from the previous pass and has not worsened: it lives in the guards, not the
+code. The single test that would catch a C1 regression scans one of the two published artifacts (W12), the
+exporter layer has no such test at all (W13), and the library signature keeps the open-by-default trap that
+made C1 possible (W8) — with the repository's own example generator sitting in it. None of that is a
+correctness or security blocker today, so none of it is a condition on this close. If v0.2.x extends this
+model to prefixes, VLANs and cables, those three are the guards to build first, with W3/W5/W7's endpoint
+regression tests next.
+
+**Optional follow-ups (candidates for v0.2.x — explicitly NOT conditions on this close):**
+
+- W12 — two leak assertions against `index_text` in `tests/test_cli.py`.
+- W13 — an exporter-layer `device_policy` test; consider passing one in `tests/test_examples.py` so the
+  shipped example demonstrates device redaction under `--view network`.
+- W11 — one README sentence stating device flags govern devices under `--view network`.
+- W8 — fold devices into `NetworkExportPolicy` so there is one policy argument and one default.
+- W3, W5, W7 — pagination, same-origin and assignment-filter regression tests on the two new endpoints.
+- W6 — the two rollback edge-case tests carried from v0.1.
+- W9 — chain the original exception and name both paths in the double-fault error.
+- W1 — document that an out-of-scope address aborts rather than being skipped, or degrade to skip-with-count.
+- I10 — extend the readiness gate's content scan beyond `examples/` if the tracked non-markdown set grows.
+- W4, I5, I8, I9 — durability stamping, structured logging, the un-redactable device name, and pre-fetch path
+  collision rejection.
+
+**Release-readiness note, not a finding:** the v0.2 tree is fully staged but **not committed**. There is
+nothing yet for a `v0.2.0` tag to point at, and the v0.1.1 audit's D3 finding is the standing reminder that a
+mirror push before a commit publishes the wrong tree. Committing, tagging, pushing, and package publication
+are operator actions explicitly reserved out of scope for this pass — this is release mechanics, not a
+verification gap, and it is not a close condition.
+
+Close-out path: `/saga-spec merge` to bake the verified v0.2 behavior into the living spec library. Not
+performed by this audit.
+
+Per instruction, this audit did not edit `ROADMAP.md` or `STATE.md`, did not commit, push, tag, or publish any
+package, did not mutate any GitHub resource, and did not contact a live NetBox. All probes ran against
+loopback stubs in `/tmp` scratch directories. It wrote `.planning/TRACEABILITY.md` and this section only.
+
+---
+
+## Audit: v0.2 finalization — view-specific default output paths (narrow recheck) — 2026-07-21
+
+Scope deliberately narrow: only the finalization fix at `src/netbox_scribe/cli.py:127-130`
+(`_default_export_paths`) and its two call sites at `cli.py:111-119`. Everything else in v0.2 is carried from
+the close-out audit above and was not re-derived. Auditor: Claude Opus 4.8 (`claude-opus-4-8`) via Claude
+Code. Tree: `HEAD = c70a628` plus the same 23 staged files; `git status --short` identical before and after.
+
+**What the fix changed.** The `export` subparser previously carried two constant `argparse` defaults
+(`snapshot/inventory/devices.yaml`, `snapshot/agent/INDEX.md`). Those constants are gone; both options now
+default to `None` and `main()` resolves `args.output or default_output` against a view-dispatched pair. The
+failure mode this prevents is `--view network` publishing network content into the device view's filenames.
+
+### Correctness
+
+- **[resolved] Defaults are view-correct and mutually non-interfering.** Probe V3 drove the installed
+  0.2.0 wheel's `nbscribe` from a clean venv against a loopback stub: plain `export` produces exactly
+  `snapshot/inventory/devices.yaml` + `snapshot/agent/INDEX.md`, and `--view network` produces exactly
+  `snapshot/inventory/network.yaml` + `snapshot/agent/NETWORK.md`. In each case `find` over the scratch
+  directory returns **two files total**, so the other view's artifacts are not created as a side effect.
+  With the other view's artifacts pre-seeded with sentinels, both sentinels survive byte-intact across the
+  opposing default export — neither default overwrites the other pair.
+- **[resolved] Artifacts are distinguished by shape, not just by name.** `devices.yaml` carries top-level
+  `devices` only; `network.yaml` adds `interfaces` and `ip_addresses` (43 vs. 65 lines). The indexes differ in
+  title and freshness stamp. `nbscribe validate` returns `Valid snapshot` for both, resolving each against its
+  own packaged schema. So no view is emitting the other's payload under the correct filename.
+- **[resolved] Explicit overrides still win, structurally.** `--output` + `--agent-index` on either view
+  create the custom paths and leave **both** default paths absent. A partial override (`--output` only) uses
+  the custom canonical path and the view's default index, which is the intended composition. The `or` idiom is
+  safe by construction rather than by luck: `pathlib.Path` defines no `__bool__`/`__len__`, so no `Path` is
+  falsy — `Path("")` normalizes to `PosixPath('.')` and is truthy. No user-supplied path can be swallowed.
+- **[resolved] The dispatch is load-bearing in both directions.** Deleting the `network` branch turns
+  `tests/test_cli.py::test_network_view_fetches_relationships_and_writes_canonical_document` red; inverting
+  the function to always return network paths turns
+  `tests/test_cli.py::test_export_command_handles_unnamed_device_without_traceback` red. Both failures are
+  `FileNotFoundError` on the missing default artifact, which is precisely the regression signature.
+
+### Test Coverage
+
+- **[warning] W14 — no repository test asserts the _negative_.** The two CLI tests pin that each view's
+  default artifacts _are_ written, and the mutation results above prove that pin is real. Neither test asserts
+  that the opposing view's files are _not_ created. Today that is safe by construction — each branch of
+  `_run_export` writes exactly one pair through `_publish_snapshot_pair` and there is no code path that could
+  touch the other pair — and Probe V3 covers it externally. It becomes worth pinning if a future view ever
+  writes more than one pair, or if a shared "write all views" convenience flag is added. Non-blocking: two
+  `assert not (tmp_path / ...).exists()` lines in the existing tests would close it.
+
+### Operability
+
+- **[warning] W15 — a degenerate `--output ""` surfaces a raw errno.** `nbscribe export --output ""`
+  resolves to `PosixPath('.')` and fails with
+  `error: [Errno 16] Device or resource busy: './..<rand>.tmp' -> '.'`. Behavior is otherwise correct: exit 1,
+  no traceback, no partial artifacts, and — importantly for this audit — **no silent fallback to the default
+  path**. This is pre-existing generic bad-path handling, not introduced by the fix, and it is not
+  view-specific. Cosmetic only; a directory-target pre-check would give a better message, and it pairs
+  naturally with I9 (pre-fetch path collision rejection) from the close-out audit.
+
+### Methodology note (recorded because it nearly produced a false finding)
+
+The first mutation attempt copied the tree with `cp -r` **including `.venv`**. Copied venv scripts embed
+absolute paths, so `uv run` inside the copy resolved back to the source repository's environment and the
+mutated tree reported a false **48 passed** — which would have been written up as "the fix is not
+regression-guarded." The behavioral probe contradicted it (the mutated `nbscribe` visibly wrote network data
+into `devices.yaml`), the contradiction was chased rather than averaged, and the root cause was found in the
+venv resolution. Re-run against an `rsync --exclude='.venv'` copy with a fresh `uv venv`, the mutations go red
+as documented. **Any future mutation testing in this project must exclude `.venv`.**
+
+Incidental hygiene: the `rsync` copy initially included the gitignored `.env`. It was deleted from the `/tmp`
+copy before any test ran, was never read, and never entered the repository.
+
+### Gate
+
+`make ci` run twice — before and after all mutation work — both green: `black --check` clean (17 files),
+`ruff check` clean, `mypy` clean (16 source files), `pytest -n auto` → **48 passed**, `public-check` →
+_Public readiness checks passed (52 tracked files)_. `git status --short` at the end is identical to the
+start, so nothing in the source tree was perturbed by the probes.
+
+### Verdict
+
+**PASS** — the view-specific default-path fix is correct, non-interfering, override-respecting, and pinned by
+tests that go red in both directions.
+
+- Critical findings: **0**
+- **Close conditions: 0 — there is no actual close condition on this recheck.**
+- Warnings: **2 new** (W14 negative-assertion coverage; W15 degenerate `--output ""` errno). Both
+  non-blocking. All prior warnings carried unchanged.
+- Requirement impact: none. REQ-014 stays **PROVEN** with added evidence; no status in `TRACEABILITY.md`
+  changed.
+
+Rationale for PASS rather than CONDITIONAL: every claim in the brief was proven through the installed wheel's
+public CLI rather than by reading the diff — correct defaults per view, non-creation and non-overwrite of the
+opposing pair, and full override precedence including the partial-override case. The one result that could
+have downgraded this to CONDITIONAL (the fix not being regression-guarded) turned out to be an artifact of my
+own harness, and the corrected mutation test shows the dispatch pinned in both directions. W14 and W15 are
+real but neither can produce a wrong artifact today: W14 is redundant with a structural guarantee, and W15 is
+a message-quality issue on a path that already fails safely without falling back to a default.
+
+**Optional follow-ups (NOT conditions on this close):**
+
+- W14 — two `assert not ...exists()` lines pinning cross-view non-creation.
+- W15 — reject directory targets before fetching, folding into I9.
+
+Per instruction, this audit did not edit `ROADMAP.md` or `STATE.md`, did not commit, push, tag, or publish any
+package, did not mutate any GitHub resource, and did not contact a live NetBox. All probes ran against a
+loopback stdlib HTTP stub serving the repository's synthetic fixtures, in `/tmp` scratch directories. It wrote
+`.planning/TRACEABILITY.md` and this section only.
