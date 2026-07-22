@@ -3,9 +3,9 @@ saga_state_version: 1.0
 milestone: v0.2
 milestone_name: Network Relationships
 status: complete
-stopped_at: v0.2.0 published to GitHub and Gitea; v0.2.x remains idle.
-last_updated: "2026-07-22T05:30:00Z"
-last_activity: 2026-07-21 — published annotated v0.2.0 tag and GitHub release after both protected CI checks passed.
+stopped_at: v0.2.0 published; GitHub and private Gitea validation CI are live; v0.2.x remains idle.
+last_updated: "2026-07-22T08:30:00Z"
+last_activity: 2026-07-22 — enabled per-repository Gitea Actions and completed the first private validation run successfully.
 ---
 
 # NetBox Scribe — State
@@ -23,6 +23,7 @@ Plain `nbscribe export` remains compatible; `nbscribe export --view network` sel
 - v0.2 final verdict: **PASS** — 19/19 project requirements PROVEN; no close conditions.
 - Release commit `ee43cd0`, annotated tag `v0.2.0`, GitHub release, and both GitHub/Gitea refs are published.
 - GitHub Actions run `29921504324` passed required Python 3.11 and 3.12 checks before tagging.
+- Gitea Actions workflow `.gitea/workflows/ci.yml` runs the canonical gate on Python 3.12; private run 269 completed successfully on `ci-runner01`.
 - PyPI distribution remains a separate explicit-approval workflow; v0.2.x relationship expansion is idle.
 
 ## Deferred
