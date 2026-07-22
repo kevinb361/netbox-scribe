@@ -4,7 +4,7 @@ This document records the publication procedure and the controls applied to the 
 
 ## Publication record
 
-Published at <https://github.com/kevinb361/netbox-scribe> on 2026-07-21 after explicit operator approval. The initial CI run passed, `main` branch protection requires both Python matrix checks, and the annotated `v0.1.0` tag is available as a GitHub release.
+Published at <https://github.com/kevinb361/netbox-scribe> on 2026-07-21 after explicit operator approval. The initial CI run passed, `main` branch protection requires both Python matrix checks, and annotated `v0.1.0` and `v0.2.0` tags are available as GitHub releases. The v0.2.0 release adds the independently audited network relationship view.
 
 ## Pre-publication decisions
 

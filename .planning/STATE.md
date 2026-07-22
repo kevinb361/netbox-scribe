@@ -3,9 +3,9 @@ saga_state_version: 1.0
 milestone: v0.2
 milestone_name: Network Relationships
 status: complete
-stopped_at: v0.2 final review and narrow frontier recheck PASS; staged tree awaits commit.
-last_updated: "2026-07-22T05:10:00Z"
-last_activity: 2026-07-21 — isolated device/network default paths and reclosed v0.2 after a 31-assertion installed-wheel frontier probe.
+stopped_at: v0.2.0 published to GitHub and Gitea; v0.2.x remains idle.
+last_updated: "2026-07-22T05:30:00Z"
+last_activity: 2026-07-21 — published annotated v0.2.0 tag and GitHub release after both protected CI checks passed.
 ---
 
 # NetBox Scribe — State
@@ -21,9 +21,9 @@ Plain `nbscribe export` remains compatible; `nbscribe export --view network` sel
 ## Active Work
 
 - v0.2 final verdict: **PASS** — 19/19 project requirements PROVEN; no close conditions.
-- Default-path regression fixed and mutation-pinned: device view writes `devices.yaml`/`INDEX.md`; network view writes `network.yaml`/`NETWORK.md`; installed-wheel probe passed 31/31 assertions.
-- Full gate: 48 tests, 52 tracked files, Black/Ruff/MyPy/public-readiness/Saga lint clean.
-- Left for operator workflow: commit the staged tree. Tag, push, GitHub release, and PyPI remain separate explicit-approval actions.
+- Release commit `ee43cd0`, annotated tag `v0.2.0`, GitHub release, and both GitHub/Gitea refs are published.
+- GitHub Actions run `29921504324` passed required Python 3.11 and 3.12 checks before tagging.
+- PyPI distribution remains a separate explicit-approval workflow; v0.2.x relationship expansion is idle.
 
 ## Deferred
 
