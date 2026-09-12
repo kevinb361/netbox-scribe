@@ -14,6 +14,7 @@ NetBox Scribe reads NetBox through its REST API and exports deterministic, schem
 - Canonical inventory is YAML. Markdown and future context packs are generated views and must not become independently edited inventory.
 - Output must be deterministic, schema-versioned, atomic, and useful in Git diffs.
 - AI-facing output must include provenance and freshness while supporting field redaction.
+- State restoration paths (e.g., rollback, prior-index recovery) must use `read_bytes()`/`write_bytes()`, never `read_text()`/`write_text()`. Universal-newline translation corrupts CRLF files.
 
 ## Layout
 
@@ -57,10 +58,6 @@ Tests use synthetic HTTP fixtures only unless a test is explicitly marked as liv
 - Primary, warning, and danger actions are visually distinct.
 - Empty/loading/error states are not raw default browser output.
 - Mobile/narrow viewport does not break the main path.
-
-## Known Issues
-
-- **Agent-index CRLF not restored:** `_publish_snapshot_pair` reads the prior index with `read_text(encoding="utf-8")`, which applies universal-newline translation. CRLF indices become LF on read and remain LF on restore. Reachable from both `export_devices` and `export_network`. Reproduced at 4eb767c; counterexample at `.planning/evidence/crlf-rollback-counterexample.py`. Deferred — no repair authorized.
 
 ## Cross-CLI
 
