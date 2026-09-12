@@ -32,3 +32,16 @@ Plain `nbscribe export` remains compatible; `nbscribe export --view network` sel
 - 2026-07-21 — MCP delivery remains a v0.3 capability; the static relationship artifacts are now proven.
 - 2026-07-21 — remaining v0.1 audit follow-ups for v0.2: document that synthesized names can collide with source names; test rollback double-fault/no-prior-index; reduce version-fixture brittleness; strengthen the typed agent-index boundary; identify invalid records operationally; add structured logging.
 - 2026-07-21 — v0.1.0 audit follow-ups for v0.2: improve redirect diagnostics and pin `follow_redirects=False`; reject output/index path collisions before fetching; handle extreme YAML nesting; improve malformed endpoint diagnostics.
+
+- 2026-09-11 — **OPEN DEFECT: agent-index rollback does not restore CRLF bytes.**
+  `_publish_snapshot_pair` captures the prior index with `read_text(encoding="utf-8")`, so
+  universal-newline translation turns CRLF into LF and the rollback writes the translated
+  text. "Restore the prior index" therefore does not restore the prior bytes. Reachable from
+  BOTH export views — `export_devices` and `export_network` both route through that helper —
+  scoped to successful index publication followed by canonical publication failure followed by
+  successful restoration. Reproduced at `4eb767c`; counterexample at
+  `.planning/evidence/crlf-rollback-counterexample.py`, which is historical evidence and NOT a
+  test, and exits 0 while the defect stands. A repair should prove byte-identical recovery for
+  the supported input domain including this counterexample, and keep absent-index and
+  double-fault coverage. Found while preparing an external Saga usefulness trial that was
+  stopped before execution; no repair is authorized by that finding.

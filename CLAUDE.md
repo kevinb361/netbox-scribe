@@ -58,6 +58,10 @@ Tests use synthetic HTTP fixtures only unless a test is explicitly marked as liv
 - Empty/loading/error states are not raw default browser output.
 - Mobile/narrow viewport does not break the main path.
 
+## Known Issues
+
+- **Agent-index CRLF not restored:** `_publish_snapshot_pair` reads the prior index with `read_text(encoding="utf-8")`, which applies universal-newline translation. CRLF indices become LF on read and remain LF on restore. Reachable from both `export_devices` and `export_network`. Reproduced at 4eb767c; counterexample at `.planning/evidence/crlf-rollback-counterexample.py`. Deferred — no repair authorized.
+
 ## Cross-CLI
 
 `AGENTS.md` is a symlink to this file. Codex reads AGENTS.md; Claude Code reads CLAUDE.md.
