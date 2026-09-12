@@ -19,15 +19,19 @@ class _NetworkClientStub:
         return self.records
 
 
+@pytest.mark.parametrize(
+    "previous_index", [b"last-valid-index\n", b"last-valid-index\r\n"], ids=["lf", "crlf"]
+)
 def test_network_export_rolls_back_index_when_canonical_publication_fails(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, previous_index: bytes
 ) -> None:
     output = tmp_path / "inventory/network.yaml"
     index = tmp_path / "agent/NETWORK.md"
     output.parent.mkdir()
     index.parent.mkdir()
-    output.write_text("last-valid-network\n")
-    index.write_text("last-valid-index\n")
+    previous_output = b"last-valid-network\n"
+    output.write_bytes(previous_output)
+    index.write_bytes(previous_index)
     records = NetworkRecords(
         devices=[{"id": 1, "name": "router-01"}],
         interfaces=[{"id": 2, "name": "eth0", "device": {"id": 1}}],
@@ -39,6 +43,7 @@ def test_network_export_rolls_back_index_when_canonical_publication_fails(
 
     def fail_canonical(path: Path, content: str) -> None:
         if path == output:
+            assert index.read_bytes() != previous_index
             raise OSError("simulated network publication failure")
         real_publish(path, content)
 
@@ -47,8 +52,8 @@ def test_network_export_rolls_back_index_when_canonical_publication_fails(
     with pytest.raises(OSError, match="simulated network publication failure"):
         export_network(cast(NetBoxClient, _NetworkClientStub(records)), output, agent_index=index)
 
-    assert output.read_text() == "last-valid-network\n"
-    assert index.read_text() == "last-valid-index\n"
+    assert output.read_bytes() == previous_output
+    assert index.read_bytes() == previous_index
 
 
 def test_network_export_rejects_dangling_device_reference_before_publication(

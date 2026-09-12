@@ -156,16 +156,20 @@ def render_network_yaml(
 
 def publish_text_atomically(output: Path, content: str) -> None:
     """Replace an output file only after its complete content is durable."""
+    _publish_bytes_atomically(output, content.encode("utf-8"))
+
+
+def _publish_bytes_atomically(output: Path, content: bytes) -> None:
+    """Atomically replace an output with exact bytes after flushing them to disk."""
     output.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(
         dir=output.parent,
         prefix=f".{output.name}.",
         suffix=".tmp",
-        text=True,
     )
     temporary = Path(temporary_name)
     try:
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+        with os.fdopen(descriptor, "wb") as handle:
             handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
@@ -182,7 +186,7 @@ def _publish_snapshot_pair(
     index_content: str,
 ) -> None:
     """Publish the index first and roll it back if canonical publication fails."""
-    previous_index = index_path.read_text(encoding="utf-8") if index_path.exists() else None
+    previous_index = index_path.read_bytes() if index_path.exists() else None
     publish_text_atomically(index_path, index_content)
     try:
         publish_text_atomically(canonical_path, canonical_content)
@@ -191,7 +195,7 @@ def _publish_snapshot_pair(
             if previous_index is None:
                 index_path.unlink(missing_ok=True)
             else:
-                publish_text_atomically(index_path, previous_index)
+                _publish_bytes_atomically(index_path, previous_index)
         except OSError:
             raise OSError(
                 "canonical publication failed and the prior agent index could not be restored"
