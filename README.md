@@ -103,6 +103,8 @@ nbscribe export \
   --exclude-field description
 ```
 
+Excluded device tags are skipped before normalization: malformed tags do not block an export when `tags` is explicitly excluded or omitted from an include-field allowlist. An explicit exclusion takes precedence over inclusion. Included tags retain their existing validation and deterministic ordering. This applies to both device-only and network exports.
+
 Custom fields are excluded by default. Include only reviewed fields:
 
 ```bash

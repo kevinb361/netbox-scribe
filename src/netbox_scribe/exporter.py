@@ -290,32 +290,33 @@ def _normalize_device(device: DeviceRecord, policy: ExportPolicy, position: int)
             ("id", "address", "dns_name", "description"),
         )
 
-    try:
-        source_tags = iter(device.get("tags", []))
-    except TypeError:
-        raise _invalid_record(location, "tags", "must be an array") from None
-    tags = [
-        reference
-        for tag in source_tags
-        if (reference := _reference(tag, ("id", "name", "slug"))) is not None
-    ]
-    if tags:
+    if policy.allows_field("tags"):
         try:
-            normalized["tags"] = sorted(
-                tags,
-                key=lambda tag: (
-                    str(tag.get("slug", tag.get("name", ""))).casefold(),
-                    tag.get("id", 0),
-                ),
-            )
+            source_tags = iter(device.get("tags", []))
         except TypeError:
-            # Mixed malformed IDs can fail sorting before schema validation is reached.
-            for index, tag in enumerate(tags):
-                if "id" in tag and type(tag["id"]) is not int:
-                    raise _invalid_record(
-                        location, f"tags[{index + 1}].id", "must be an integer"
-                    ) from None
-            raise _invalid_record(location, "tags", "cannot order tag references") from None
+            raise _invalid_record(location, "tags", "must be an array") from None
+        tags = [
+            reference
+            for tag in source_tags
+            if (reference := _reference(tag, ("id", "name", "slug"))) is not None
+        ]
+        if tags:
+            try:
+                normalized["tags"] = sorted(
+                    tags,
+                    key=lambda tag: (
+                        str(tag.get("slug", tag.get("name", ""))).casefold(),
+                        tag.get("id", 0),
+                    ),
+                )
+            except TypeError:
+                # Mixed malformed IDs can fail sorting before schema validation is reached.
+                for index, tag in enumerate(tags):
+                    if "id" in tag and type(tag["id"]) is not int:
+                        raise _invalid_record(
+                            location, f"tags[{index + 1}].id", "must be an integer"
+                        ) from None
+                raise _invalid_record(location, "tags", "cannot order tag references") from None
 
     for field in tuple(normalized):
         if field not in {"id", "name"} and not policy.allows_field(field):
