@@ -67,7 +67,9 @@ def test_network_export_rejects_dangling_device_reference_before_publication(
         ip_addresses=[],
     )
 
-    with pytest.raises(ValueError, match="interface 2 references missing device 999"):
+    with pytest.raises(
+        ValueError, match="interfaces id=2 field=device.id: references missing device"
+    ):
         export_network(cast(NetBoxClient, _NetworkClientStub(records)), output)
 
     assert output.read_text() == "last-valid-network\n"
@@ -82,7 +84,7 @@ def test_network_export_rejects_dangling_device_reference_before_publication(
                 interfaces=[],
                 ip_addresses=[],
             ),
-            "duplicate device ids",
+            "devices id=1 field=id: duplicate id",
         ),
         (
             NetworkRecords(
@@ -97,7 +99,7 @@ def test_network_export_rejects_dangling_device_reference_before_publication(
                     }
                 ],
             ),
-            "IP address 3 references missing interface 999",
+            "ip_addresses id=3 field=assigned_object.id: references missing interface",
         ),
     ],
 )

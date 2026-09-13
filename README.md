@@ -145,7 +145,15 @@ Every export is checked against the packaged JSON Schema before publication. Exi
 nbscribe validate snapshot/inventory/devices.yaml
 ```
 
-An unsupported schema version or invalid record exits non-zero with a bounded error.
+An unsupported schema version or invalid record exits non-zero. Validation errors identify the
+resource, a positive NetBox integer ID (up to signed 64-bit), and the structural field to fix.
+Otherwise, `record #N` is a one-based position: API retrieval order for normalization failures,
+canonical document order for schema failures. Nested array positions are also one-based.
+Diagnostics omit rejected values, names, addresses, custom-field keys, and unknown keys;
+unknown fields are reported at their containing object. Unsupported versions report only the
+expected version. This corrects earlier error text; schemas and successful output are unchanged.
+Fix the reported field in NetBox (or the supplied snapshot for `validate`) and retry. Failed
+validation leaves both existing canonical YAML and the agent index byte-for-byte untouched.
 
 ## Version snapshots with Git
 

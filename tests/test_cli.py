@@ -312,7 +312,7 @@ def test_validate_command_reports_incompatible_schema_version(
     exit_code = main(["validate", str(snapshot)])
 
     assert exit_code == 1
-    assert "unsupported schema version 2; expected 1" in capsys.readouterr().err
+    assert "unsupported schema version; expected 1" in capsys.readouterr().err
 
 
 def test_validate_command_reports_non_utf8_snapshot_without_traceback(

@@ -11,5 +11,5 @@ source: netbox
 devices: []
 """
 
-    with pytest.raises(SnapshotValidationError, match="unsupported schema version 2; expected 1"):
+    with pytest.raises(SnapshotValidationError, match="unsupported schema version; expected 1"):
         validate_snapshot_text(snapshot)

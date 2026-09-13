@@ -137,7 +137,7 @@ def test_devices_with_missing_name_receive_stable_exported_identity() -> None:
 
 
 def test_device_without_usable_id_fails_cleanly() -> None:
-    with pytest.raises(ValueError, match="device record has no usable integer id"):
+    with pytest.raises(ValueError, match="devices record #1 field=id: must be a positive integer"):
         render_devices_yaml([{"id": None, "name": None}])
 
 

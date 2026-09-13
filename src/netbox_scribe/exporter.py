@@ -15,7 +15,11 @@ from netbox_scribe.agent_index import render_agent_index, render_network_index
 from netbox_scribe.client import DeviceRecord, NetBoxClient, NetworkRecords
 from netbox_scribe.contracts import SCHEMA_VERSION
 from netbox_scribe.policy import ExportPolicy, NetworkExportPolicy, ResourcePolicy
-from netbox_scribe.validation import validate_snapshot_text
+from netbox_scribe.validation import (
+    SnapshotValidationError,
+    record_location,
+    validate_snapshot_text,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,7 +49,10 @@ def export_devices(
     """Write canonical devices and an optional derived agent index."""
     devices = client.list_devices()
     effective_policy = policy or ExportPolicy()
-    normalized = [_normalize_device(device, effective_policy) for device in devices]
+    normalized = [
+        _normalize_device(device, effective_policy, position)
+        for position, device in enumerate(devices)
+    ]
     content = _render_devices_yaml(normalized)
     validate_snapshot_text(content)
 
@@ -126,15 +133,16 @@ def render_network_yaml(
     """Normalize and deterministically render the canonical network document."""
     effective_policy = policy or NetworkExportPolicy()
     devices = [
-        _normalize_device(device, device_policy or ExportPolicy()) for device in records.devices
+        _normalize_device(device, device_policy or ExportPolicy(), position)
+        for position, device in enumerate(records.devices)
     ]
     interfaces = [
-        _normalize_interface(interface, effective_policy.interfaces)
-        for interface in records.interfaces
+        _normalize_interface(interface, effective_policy.interfaces, position)
+        for position, interface in enumerate(records.interfaces)
     ]
     ip_addresses = [
-        _normalize_ip_address(address, effective_policy.ip_addresses)
-        for address in records.ip_addresses
+        _normalize_ip_address(address, effective_policy.ip_addresses, position)
+        for position, address in enumerate(records.ip_addresses)
     ]
     _validate_network_relationships(devices, interfaces, ip_addresses)
     document = {
@@ -214,7 +222,10 @@ def _agent_index_record(source: DeviceRecord, normalized: Mapping[str, Any]) -> 
 def render_devices_yaml(devices: list[DeviceRecord], *, policy: ExportPolicy | None = None) -> str:
     """Normalize NetBox devices and serialize canonical, deterministic YAML."""
     effective_policy = policy or ExportPolicy()
-    normalized = [_normalize_device(device, effective_policy) for device in devices]
+    normalized = [
+        _normalize_device(device, effective_policy, position)
+        for position, device in enumerate(devices)
+    ]
     return _render_devices_yaml(normalized)
 
 
@@ -238,10 +249,9 @@ def _render_devices_yaml(normalized: list[dict[str, Any]]) -> str:
     )
 
 
-def _normalize_device(device: DeviceRecord, policy: ExportPolicy) -> dict[str, Any]:
-    device_id = device.get("id")
-    if not isinstance(device_id, int) or isinstance(device_id, bool) or device_id <= 0:
-        raise ValueError("device record has no usable integer id")
+def _normalize_device(device: DeviceRecord, policy: ExportPolicy, position: int) -> dict[str, Any]:
+    location = record_location("devices", device, position)
+    device_id = _positive_id(device.get("id"), location, "id")
     source_name = device.get("name")
     name = (
         source_name
@@ -280,19 +290,32 @@ def _normalize_device(device: DeviceRecord, policy: ExportPolicy) -> dict[str, A
             ("id", "address", "dns_name", "description"),
         )
 
+    try:
+        source_tags = iter(device.get("tags", []))
+    except TypeError:
+        raise _invalid_record(location, "tags", "must be an array") from None
     tags = [
         reference
-        for tag in device.get("tags", [])
+        for tag in source_tags
         if (reference := _reference(tag, ("id", "name", "slug"))) is not None
     ]
     if tags:
-        normalized["tags"] = sorted(
-            tags,
-            key=lambda tag: (
-                str(tag.get("slug", tag.get("name", ""))).casefold(),
-                tag.get("id", 0),
-            ),
-        )
+        try:
+            normalized["tags"] = sorted(
+                tags,
+                key=lambda tag: (
+                    str(tag.get("slug", tag.get("name", ""))).casefold(),
+                    tag.get("id", 0),
+                ),
+            )
+        except TypeError:
+            # Mixed malformed IDs can fail sorting before schema validation is reached.
+            for index, tag in enumerate(tags):
+                if "id" in tag and type(tag["id"]) is not int:
+                    raise _invalid_record(
+                        location, f"tags[{index + 1}].id", "must be an integer"
+                    ) from None
+            raise _invalid_record(location, "tags", "cannot order tag references") from None
 
     for field in tuple(normalized):
         if field not in {"id", "name"} and not policy.allows_field(field):
@@ -315,31 +338,41 @@ def _validate_network_relationships(
     interfaces: list[dict[str, Any]],
     ip_addresses: list[dict[str, Any]],
 ) -> None:
-    device_ids = _unique_ids(devices, "device")
-    interface_ids = _unique_ids(interfaces, "interface")
-    _unique_ids(ip_addresses, "IP address")
-    for interface in interfaces:
-        device_id = int(interface["device"]["id"])
-        if device_id not in device_ids:
-            raise ValueError(f"interface {interface['id']} references missing device {device_id}")
-    for address in ip_addresses:
-        interface_id = int(address["assigned_object"]["id"])
-        if interface_id not in interface_ids:
-            raise ValueError(
-                f"IP address {address['id']} references missing interface {interface_id}"
+    device_ids = _unique_ids(devices, "devices")
+    interface_ids = _unique_ids(interfaces, "interfaces")
+    _unique_ids(ip_addresses, "ip_addresses")
+    for position, interface in enumerate(interfaces):
+        if interface["device"]["id"] not in device_ids:
+            raise _invalid_record(
+                record_location("interfaces", interface, position),
+                "device.id",
+                "references missing device",
+            )
+    for position, address in enumerate(ip_addresses):
+        if address["assigned_object"]["id"] not in interface_ids:
+            raise _invalid_record(
+                record_location("ip_addresses", address, position),
+                "assigned_object.id",
+                "references missing interface",
             )
 
 
-def _unique_ids(records: list[dict[str, Any]], label: str) -> set[int]:
-    ids = [int(record["id"]) for record in records]
-    if len(ids) != len(set(ids)):
-        raise ValueError(f"network snapshot contains duplicate {label} ids")
-    return set(ids)
+def _unique_ids(records: list[dict[str, Any]], resource: str) -> set[int]:
+    ids: set[int] = set()
+    for position, record in enumerate(records):
+        record_id = int(record["id"])
+        if record_id in ids:
+            raise _invalid_record(record_location(resource, record, position), "id", "duplicate id")
+        ids.add(record_id)
+    return ids
 
 
-def _normalize_interface(record: DeviceRecord, policy: ResourcePolicy) -> dict[str, Any]:
-    interface_id = _positive_id(record, "interface")
-    device_id = _positive_reference_id(record.get("device"), "interface device")
+def _normalize_interface(
+    record: DeviceRecord, policy: ResourcePolicy, position: int
+) -> dict[str, Any]:
+    location = record_location("interfaces", record, position)
+    interface_id = _positive_id(record.get("id"), location, "id")
+    device_id = _positive_id(_mapping(record.get("device")).get("id"), location, "device.id")
     name = record.get("name")
     normalized: dict[str, Any] = {
         "id": interface_id,
@@ -353,16 +386,17 @@ def _normalize_interface(record: DeviceRecord, policy: ResourcePolicy) -> dict[s
     return normalized
 
 
-def _normalize_ip_address(record: DeviceRecord, policy: ResourcePolicy) -> dict[str, Any]:
-    address_id = _positive_id(record, "IP address")
+def _normalize_ip_address(
+    record: DeviceRecord, policy: ResourcePolicy, position: int
+) -> dict[str, Any]:
+    location = record_location("ip_addresses", record, position)
+    address_id = _positive_id(record.get("id"), location, "id")
     address = record.get("address")
     if not isinstance(address, str) or not address:
-        raise ValueError(f"IP address {address_id} has no usable address")
+        raise _invalid_record(location, "address", "must be a non-empty string")
     if record.get("assigned_object_type") != "dcim.interface":
-        raise ValueError(f"IP address {address_id} is not assigned to a device interface")
-    interface_id = record.get("assigned_object_id")
-    if not isinstance(interface_id, int) or isinstance(interface_id, bool) or interface_id <= 0:
-        raise ValueError(f"IP address {address_id} has no usable assigned interface id")
+        raise _invalid_record(location, "assigned_object_type", "must be dcim.interface")
+    interface_id = _positive_id(record.get("assigned_object_id"), location, "assigned_object_id")
     normalized: dict[str, Any] = {
         "id": address_id,
         "address": address,
@@ -391,18 +425,15 @@ def _copy_allowed_custom_fields(
         normalized["custom_fields"] = allowed
 
 
-def _positive_id(record: Mapping[str, Any], label: str) -> int:
-    record_id = record.get("id")
+def _positive_id(record_id: object, location: str, field: str) -> int:
     if not isinstance(record_id, int) or isinstance(record_id, bool) or record_id <= 0:
-        raise ValueError(f"{label} record has no usable integer id")
+        raise _invalid_record(location, field, "must be a positive integer")
     return record_id
 
 
-def _positive_reference_id(value: object, label: str) -> int:
-    record_id = _mapping(value).get("id")
-    if not isinstance(record_id, int) or isinstance(record_id, bool) or record_id <= 0:
-        raise ValueError(f"{label} has no usable integer id")
-    return record_id
+def _invalid_record(location: str, field: str, problem: str) -> SnapshotValidationError:
+    """All arguments are structural labels or safe locations, never raw record values."""
+    return SnapshotValidationError(f"invalid record at {location} field={field}: {problem}")
 
 
 def _copy_scalar(target: dict[str, Any], source: Mapping[str, Any], field: str) -> None:
