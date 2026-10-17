@@ -7,7 +7,7 @@ import pytest
 
 from netbox_scribe.client import NetBoxClient, NetworkRecords
 from netbox_scribe.exporter import export_network, render_network_yaml
-from netbox_scribe.policy import NetworkExportPolicy, ResourcePolicy
+from netbox_scribe.policy import ExportPolicy, NetworkExportPolicy, ResourcePolicy
 from netbox_scribe.validation import validate_snapshot_text
 
 
@@ -190,3 +190,60 @@ def test_network_yaml_is_deterministic_and_valid_under_reordered_input() -> None
     assert [record["id"] for record in document["devices"]] == [1, 2]
     assert [record["id"] for record in document["interfaces"]] == [10, 20]
     assert [record["id"] for record in document["ip_addresses"]] == [100, 200]
+
+
+@pytest.mark.parametrize("allowlist", [False, True], ids=["exclude", "allowlist"])
+def test_network_export_applies_device_redaction_to_both_artifacts(
+    tmp_path: Path, allowlist: bool
+) -> None:
+    device = {
+        "id": 1,
+        "name": "router-01",
+        "description": "allowed-device-description",
+        "serial": "denied-device-serial",
+        "custom_fields": {
+            "owner": "allowed-device-owner",
+            "secret": "denied-device-secret",
+            "private_note": "denied-unlisted-note",
+        },
+    }
+    records = NetworkRecords(
+        [device],
+        [{"id": 2, "name": "eth0", "device": device}],
+        [
+            {
+                "id": 3,
+                "address": "192.0.2.1/24",
+                "assigned_object_type": "dcim.interface",
+                "assigned_object_id": 2,
+                "assigned_object": {"id": 2, "device": device},
+            }
+        ],
+    )
+    output = tmp_path / "inventory/network.yaml"
+    index = tmp_path / "agent/NETWORK.md"
+    device_policy = ExportPolicy(
+        include_fields=frozenset({"description"}) if allowlist else None,
+        exclude_fields=frozenset() if allowlist else frozenset({"serial"}),
+        include_custom_fields=frozenset({"owner", "secret"}),
+        exclude_custom_fields=frozenset({"secret"}),
+    )
+
+    export_network(
+        cast(NetBoxClient, _NetworkClientStub(records)),
+        output,
+        agent_index=index,
+        device_policy=device_policy,
+    )
+
+    canonical = output.read_text()
+    document = validate_snapshot_text(canonical)
+    assert document["devices"][0]["description"] == "allowed-device-description"
+    assert document["devices"][0]["custom_fields"] == {"owner": "allowed-device-owner"}
+    assert document["interfaces"][0]["device"] == {"type": "dcim.device", "id": 1}
+    assert document["ip_addresses"][0]["assigned_object"] == {"type": "dcim.interface", "id": 2}
+    assert "router-01" in index.read_text()
+    assert "eth0" in index.read_text()
+    for artifact in (canonical, index.read_text()):
+        for denied in ("denied-device-serial", "denied-device-secret", "denied-unlisted-note"):
+            assert denied not in artifact

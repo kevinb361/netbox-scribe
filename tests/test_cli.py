@@ -200,6 +200,8 @@ def test_network_view_fetches_relationships_and_writes_canonical_document(
     assert document["devices"][0]["custom_fields"] == {"owner": "included-network-owner"}
     assert "denied-network-serial" not in output.read_text()
     assert "denied-network-note" not in output.read_text()
+    assert "denied-network-serial" not in index_text
+    assert "denied-network-note" not in index_text
     assert document["interfaces"][0]["device"] == {"type": "dcim.device", "id": 1}
     assert document["ip_addresses"][0]["assigned_object"] == {
         "type": "dcim.interface",
@@ -207,7 +209,7 @@ def test_network_view_fetches_relationships_and_writes_canonical_document(
     }
     captured = capsys.readouterr()
     assert "Exported network: 1 device, 1 interface, 1 IP address" in captured.out
-    assert "network-cli-secret" not in captured.out + captured.err + output.read_text()
+    assert "network-cli-secret" not in captured.out + captured.err + output.read_text() + index_text
 
 
 def test_export_command_handles_unnamed_device_without_traceback(

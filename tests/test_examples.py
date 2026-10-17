@@ -59,7 +59,16 @@ def test_synthetic_network_outputs_match_production_export(tmp_path: Path) -> No
     with NetBoxClient(
         "https://netbox.example", "synthetic-token", transport=httpx.MockTransport(handler)
     ) as client:
-        export_network(client, output, agent_index=index, policy=policy)
+        export_network(
+            client,
+            output,
+            agent_index=index,
+            policy=policy,
+            device_policy=ExportPolicy(
+                exclude_fields=frozenset({"serial"}),
+                include_custom_fields=frozenset({"owner"}),
+            ),
+        )
 
     assert output.read_bytes() == (EXAMPLES / "output/inventory/network.yaml").read_bytes()
     assert index.read_bytes() == (EXAMPLES / "output/agent/NETWORK.md").read_bytes()

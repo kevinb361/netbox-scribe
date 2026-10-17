@@ -137,6 +137,10 @@ nbscribe export --view network \
   --include-ip-address-field dns_name
 ```
 
+Device flags also apply under `--view network`. The committed synthetic network output uses
+`--exclude-field serial --include-custom-field owner` alongside
+`--include-interface-field description --include-ip-address-field dns_name`.
+
 Corresponding `--exclude-interface-*` and `--exclude-ip-address-*` flags take precedence. Mandatory IDs, names, addresses, and typed relationship references cannot be excluded. See the synthetic network fixtures and generated outputs under [`examples/`](examples/).
 
 ## Validate

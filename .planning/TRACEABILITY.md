@@ -197,3 +197,22 @@ change any status, and the counts tables above stand.
 This addendum did not edit `ROADMAP.md` or `STATE.md`, did not commit, push, tag, or publish, did not mutate
 any GitHub resource, and did not contact a live NetBox. The copied working tree in `/tmp` briefly included the
 gitignored `.env`; it was deleted from the copy before any test ran and never entered the repository.
+
+
+## Executor evidence supplement — 2026-10-17 network redaction guards
+
+This supplement records local evidence on `harden-network-redaction`; it does not change historical
+requirement classifications, milestone verdicts, or independently dispose audit findings.
+
+- REQ-007 / REQ-019, follow-ups W12/W13: CLI tests now scan both YAML and Markdown for denied
+  device values; exporter tests exercise device exclusions, allowlisting, custom-field deny precedence,
+  and nested device echoes in interface/IP input. Both artifacts must remain free of denied values.
+- W11: README explicitly documents device flags under `--view network`. The production-generated
+  synthetic network fixture now excludes serials and includes the reviewed `owner` custom field.
+- Mutation check: removing `device_policy` forwarding in `export_network` makes both new cases fail
+  (2 failed); the original exporter bytes were restored. No production implementation changed.
+- `make ci`: 125 passed, formatting/lint/types/public-readiness checks passed (56 tracked files).
+  Independent re-verification of W11/W12/W13 remains pending.
+- Records reconciled with landed September fixes: `3da843c` safe validation diagnostics and
+  `4d6fa39` excluded-tag normalization. Their tests passed in the 123-test pre-change baseline;
+  this is fresh gate evidence, not a new independent audit of those fixes.

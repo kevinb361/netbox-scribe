@@ -3,9 +3,9 @@ saga_state_version: 1.0
 milestone: v0.2
 milestone_name: Network Relationships
 status: complete
-stopped_at: v0.2.0 published; GitHub and private Gitea validation CI are live; v0.2.x remains idle.
-last_updated: "2026-07-22T08:30:00Z"
-last_activity: 2026-07-22 — enabled per-repository Gitea Actions and completed the first private validation run successfully.
+stopped_at: Local redaction hardening verified on harden-network-redaction; changes uncommitted; v0.2.x requirements remain unplanned.
+last_updated: "2026-10-17T06:02:59Z"
+last_activity: 2026-10-17 — added network redaction guards and reconciled post-release fixes; local gate passed with 125 tests.
 ---
 
 # NetBox Scribe — State
@@ -14,11 +14,26 @@ last_activity: 2026-07-22 — enabled per-repository Gitea Actions and completed
 
 Phase/Milestone: v0.2 Network Relationships
 Status: complete — independent frontier audit and finalization recheck PASS
-Last activity: 2026-07-21 — plain and network views now use distinct default canonical/index pairs; explicit overrides remain authoritative.
+Last activity: 2026-10-17 — post-release hardening verified locally; v0.2.x expansion remains unplanned.
 
 Plain `nbscribe export` remains compatible; `nbscribe export --view network` selects the new view. Partitioned manifests and immutable generation bundles were rejected for the tracer and are documented in decision 0003.
 
 ## Active Work
+
+- 2026-10-17 — local redaction hardening implemented on `harden-network-redaction`, uncommitted.
+  Added exporter-layer exclusion/allowlist coverage, deny-precedence and nested-echo checks,
+  plus CLI leak checks for YAML and Markdown (audit follow-ups W12/W13).
+  Synthetic network output excludes serials and includes only reviewed `owner` custom fields;
+  README now states device flags also govern network exports (W11).
+  Verification: `make ci` passed with 125 tests; removing device-policy forwarding caused
+  both new parameterized cases to fail, and the production source was restored byte-for-byte.
+  Executor evidence only; independent re-verification of these audit follow-ups remains pending.
+- 2026-10-17 — reconciled landed fixes `3da843c` (safe, actionable validation diagnostics)
+  and `4d6fa39` (excluded tags skipped before normalization), both dated 2026-09-13.
+  Their regression suites are `tests/test_safe_validation.py` and `tests/test_excluded_tags.py`;
+  the unchanged baseline gate passed with 123 tests before this slice.
+- Next: define bounded v0.2.x requirements before extending relationships. The separate-policy
+  API footgun (W8) and endpoint pagination/origin/filter coverage (W3/W5/W7) remain candidates.
 
 - v0.2 final verdict: **PASS** — 19/19 project requirements PROVEN; no close conditions.
 - Release commit `ee43cd0`, annotated tag `v0.2.0`, GitHub release, and both GitHub/Gitea refs are published.
