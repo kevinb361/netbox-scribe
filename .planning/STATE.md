@@ -32,8 +32,17 @@ Plain `nbscribe export` remains compatible; `nbscribe export --view network` sel
   and `4d6fa39` (excluded tags skipped before normalization), both dated 2026-09-13.
   Their regression suites are `tests/test_safe_validation.py` and `tests/test_excluded_tags.py`;
   the unchanged baseline gate passed with 123 tests before this slice.
-- Next: define bounded v0.2.x requirements before extending relationships. The separate-policy
-  API footgun (W8) and endpoint pagination/origin/filter coverage (W3/W5/W7) remain candidates.
+- 2026-10-17 — REQ-020 (audit W8) implemented on `fix/network-policy-defaults`, pending
+  independent review. Reproduced first: `render_network_yaml(records, policy=<closed
+NetworkExportPolicy>)` withheld interface MACs but published device `serial`/`asset_tag`.
+  `NetworkExportPolicy` now carries `devices`; an explicit network policy with no device policy
+  raises before NetBox is fetched, and a device policy given twice is rejected. `policy=None`
+  and the legacy `device_policy` argument are unchanged; the CLI passes one policy object.
+  Library migration: add `devices=ExportPolicy(...)` (`ExportPolicy()` keeps the old open
+  device output) or keep passing `device_policy`. Executor evidence: `make ci` 128 passed on an
+  isolated snapshot of the candidate tree; reverting the fail-closed branch fails the new test.
+- Next: define bounded v0.2.x requirements before extending relationships. Endpoint
+  pagination/origin/filter coverage (W3/W5/W7) remains a candidate.
 
 - v0.2 final verdict: **PASS** — 19/19 project requirements PROVEN; no close conditions.
 - Release commit `ee43cd0`, annotated tag `v0.2.0`, GitHub release, and both GitHub/Gitea refs are published.

@@ -145,6 +145,7 @@ def test_network_policy_includes_only_explicit_related_fields_and_deny_wins() ->
             include_fields=frozenset({"dns_name", "description"}),
             exclude_fields=frozenset({"description"}),
         ),
+        devices=ExportPolicy(),
     )
 
     rendered = render_network_yaml(records, policy=policy)
@@ -247,3 +248,84 @@ def test_network_export_applies_device_redaction_to_both_artifacts(
     for artifact in (canonical, index.read_text()):
         for denied in ("denied-device-serial", "denied-device-secret", "denied-unlisted-note"):
             assert denied not in artifact
+
+
+class _RecordingNetworkClientStub(_NetworkClientStub):
+    def __init__(self, records: NetworkRecords) -> None:
+        super().__init__(records)
+        self.fetches = 0
+
+    def list_network_records(self) -> NetworkRecords:
+        self.fetches += 1
+        return super().list_network_records()
+
+
+def _records_with_sensitive_device() -> NetworkRecords:
+    return NetworkRecords(
+        devices=[
+            {
+                "id": 1,
+                "name": "router-01",
+                "serial": "denied-device-serial",
+                "description": "allowed-device-description",
+            }
+        ],
+        interfaces=[{"id": 2, "name": "eth0", "device": {"id": 1}}],
+        ip_addresses=[],
+    )
+
+
+def test_explicit_network_policy_without_device_policy_fails_before_fetch(
+    tmp_path: Path,
+) -> None:
+    client = _RecordingNetworkClientStub(_records_with_sensitive_device())
+    output = tmp_path / "inventory/network.yaml"
+    index = tmp_path / "agent/NETWORK.md"
+    closed = NetworkExportPolicy(interfaces=ResourcePolicy(), ip_addresses=ResourcePolicy())
+
+    with pytest.raises(ValueError, match=r"NetworkExportPolicy\.devices"):
+        export_network(cast(NetBoxClient, client), output, agent_index=index, policy=closed)
+    with pytest.raises(ValueError, match=r"NetworkExportPolicy\.devices"):
+        render_network_yaml(_records_with_sensitive_device(), policy=closed)
+
+    assert client.fetches == 0
+    assert not output.exists()
+    assert not index.exists()
+
+
+def test_network_policy_devices_matches_legacy_device_policy_bytes(tmp_path: Path) -> None:
+    device_policy = ExportPolicy(exclude_fields=frozenset({"serial"}))
+    unified = tmp_path / "unified"
+    legacy = tmp_path / "legacy"
+    export_network(
+        cast(NetBoxClient, _NetworkClientStub(_records_with_sensitive_device())),
+        unified / "network.yaml",
+        agent_index=unified / "NETWORK.md",
+        policy=NetworkExportPolicy(devices=device_policy),
+    )
+    export_network(
+        cast(NetBoxClient, _NetworkClientStub(_records_with_sensitive_device())),
+        legacy / "network.yaml",
+        agent_index=legacy / "NETWORK.md",
+        device_policy=device_policy,
+    )
+
+    for name in ("network.yaml", "NETWORK.md"):
+        assert (unified / name).read_bytes() == (legacy / name).read_bytes()
+        assert b"denied-device-serial" not in (unified / name).read_bytes()
+    assert b"allowed-device-description" in (unified / "network.yaml").read_bytes()
+
+
+def test_network_export_rejects_two_device_policies_before_fetch(tmp_path: Path) -> None:
+    client = _RecordingNetworkClientStub(_records_with_sensitive_device())
+    policy = NetworkExportPolicy(devices=ExportPolicy(exclude_fields=frozenset({"serial"})))
+
+    with pytest.raises(ValueError, match="device policy"):
+        export_network(
+            cast(NetBoxClient, client),
+            tmp_path / "network.yaml",
+            policy=policy,
+            device_policy=ExportPolicy(),
+        )
+
+    assert client.fetches == 0

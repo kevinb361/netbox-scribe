@@ -88,6 +88,7 @@ def export_network(
     device_policy: ExportPolicy | None = None,
 ) -> NetworkExportCounts:
     """Write the canonical network document and optional derived index."""
+    _resolve_network_policies(policy, device_policy)  # reject before contacting NetBox
     records = client.list_network_records()
     content = render_network_yaml(records, policy=policy, device_policy=device_policy)
     document = validate_snapshot_text(content)
@@ -124,6 +125,27 @@ def _network_freshness(records: NetworkRecords) -> str:
     return max(values, default="unknown")
 
 
+def _resolve_network_policies(
+    policy: NetworkExportPolicy | None,
+    device_policy: ExportPolicy | None,
+) -> tuple[NetworkExportPolicy, ExportPolicy]:
+    """Pick exactly one device policy; never fall back to open devices under an explicit policy."""
+    if policy is None:
+        return NetworkExportPolicy(), device_policy or ExportPolicy()
+    if device_policy is not None:
+        if policy.devices is not None:
+            raise ValueError(
+                "device policy given twice: use NetworkExportPolicy.devices or device_policy"
+            )
+        return policy, device_policy
+    if policy.devices is None:
+        raise ValueError(
+            "NetworkExportPolicy.devices is unset; pass devices=ExportPolicy(...) "
+            "(ExportPolicy() exports every optional device field)"
+        )
+    return policy, policy.devices
+
+
 def render_network_yaml(
     records: NetworkRecords,
     *,
@@ -131,9 +153,9 @@ def render_network_yaml(
     device_policy: ExportPolicy | None = None,
 ) -> str:
     """Normalize and deterministically render the canonical network document."""
-    effective_policy = policy or NetworkExportPolicy()
+    effective_policy, effective_device_policy = _resolve_network_policies(policy, device_policy)
     devices = [
-        _normalize_device(device, device_policy or ExportPolicy(), position)
+        _normalize_device(device, effective_device_policy, position)
         for position, device in enumerate(records.devices)
     ]
     interfaces = [

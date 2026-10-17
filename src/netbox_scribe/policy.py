@@ -47,10 +47,16 @@ class ResourcePolicy:
 
 @dataclass(frozen=True, slots=True)
 class NetworkExportPolicy:
-    """Independent interface and IP-address export controls."""
+    """Device, interface and IP-address export controls for the network view.
+
+    Interfaces and IP addresses are closed by default. ``devices`` has no default on purpose:
+    device fields are open by default (``ExportPolicy()``), so an explicit network policy must
+    choose its device policy rather than inherit that open default unnoticed.
+    """
 
     interfaces: ResourcePolicy = field(default_factory=ResourcePolicy)
     ip_addresses: ResourcePolicy = field(default_factory=ResourcePolicy)
+    devices: ExportPolicy | None = None
 
     def __post_init__(self) -> None:
         _reject_unknown(self.interfaces, OPTIONAL_INTERFACE_FIELDS, "interface")

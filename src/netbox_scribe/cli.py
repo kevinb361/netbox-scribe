@@ -104,6 +104,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     include_custom_fields=frozenset(args.include_ip_address_custom_field),
                     exclude_custom_fields=frozenset(args.exclude_ip_address_custom_field),
                 ),
+                devices=policy,
             )
         except ValueError as exc:
             print(f"error: {exc}", file=sys.stderr)
@@ -170,7 +171,6 @@ def _run_export(
                     output,
                     agent_index=agent_index,
                     policy=network_policy,
-                    device_policy=policy,
                 )
             else:
                 count = export_devices(client, output, agent_index=agent_index, policy=policy)
